@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Simulation d'assistance informatique</title>
-  <meta name="description" content="Simulation d'appels au support informatique : répondre à l'utilisateur et créer le ticket.">
+  <meta name="description" content="Simulation de demandes au support informatique : répondre à l'utilisateur et créer le ticket.">
   <link rel="stylesheet" href="css/style.css">
   <!-- Applique le thème mémorisé avant l'affichage, pour éviter un flash de couleur -->
   <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
@@ -48,12 +48,12 @@
     <section class="ecran carte verre" id="ecran-consigne" hidden>
       <h2>Avant de commencer</h2>
       <ol class="consigne">
-        <li>Vous êtes technicien au centre de services. Des utilisateurs vous appellent.</li>
-        <li>Pour chaque appel, choisissez la réponse que vous donneriez à l'utilisateur.</li>
-        <li>En parallèle, créez le ticket dans l'outil de ticketing, puis enregistrez-le pour passer à l'appel suivant.</li>
+        <li>Vous êtes technicien au centre de services. Des utilisateurs vous sollicitent par téléphone, courriel, en direct ou via le portail.</li>
+        <li>Pour chaque demande, choisissez la réponse que vous donneriez à l'utilisateur.</li>
+        <li>En parallèle, créez le ticket dans l'outil de ticketing, puis enregistrez-le pour passer à la demande suivante.</li>
         <li>À la fin, un rapport s'affiche : téléchargez-le ou imprimez-le pour votre formateur.</li>
       </ol>
-      <p class="sous-titre"><span id="nb-tickets">5</span> appels · chaque bonne réponse rapporte 2 étoiles, une réponse en partie juste 1 étoile.</p>
+      <p class="sous-titre"><span id="nb-tickets">5</span> demandes ·chaque bonne réponse rapporte 2 étoiles, une réponse en partie juste 1 étoile.</p>
       <button class="btn principal" id="btn-commencer" type="button">Commencer</button>
     </section>
 
@@ -62,7 +62,7 @@
       <section class="panneau verre" aria-labelledby="titre-chat">
         <div class="panneau-titre">
           <h2 id="titre-chat">Appel entrant</h2>
-          <span class="pastille">Téléphone</span>
+          <span class="pastille" id="pastille-source">Téléphone</span>
         </div>
         <div class="chat" id="chat" aria-live="polite"></div>
         <div class="choix-titre" id="choix-titre">Votre réponse</div>

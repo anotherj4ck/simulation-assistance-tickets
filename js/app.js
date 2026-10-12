@@ -17,6 +17,16 @@
   var SOURCES = ["Téléphone", "Courriel", "Direct", "Helpdesk", "Autre"];
   var STATUTS = ["Nouveau", "En cours (attribué)", "En cours (planifié)", "En attente", "Résolu", "Clos"];
 
+  // Titre du panneau de gauche selon la source de la demande.
+  // Pour « Autre », le titre vient du champ canal du ticket (ex. « Message Teams »).
+  var TITRES_SOURCE = {
+    "Téléphone": "Appel entrant",
+    "Courriel": "Courriel reçu",
+    "Direct": "Visite au bureau",
+    "Helpdesk": "Demande via le portail",
+    "Autre": "Autre canal"
+  };
+
   // Priorité = f(urgence, impact). Reprend la matrice proposée par défaut dans GLPI
   // (Configuration > Générale > Assistance) : MATRICE[urgence][impact], valeurs de 1 à 5.
   var MATRICE = {
@@ -82,6 +92,8 @@
     if (!t.id) p.push("id manquant");
     if (!t.nom) p.push("nom manquant");
     if (!t.demande) p.push("demande manquante");
+    if (SOURCES.indexOf(t.source) === -1) p.push("source invalide (valeurs possibles : " + SOURCES.join(", ") + ")");
+    if (t.source === "Courriel" && !t.objet) p.push("objet manquant (obligatoire pour un courriel)");
     if (!Array.isArray(t.reponses) || t.reponses.length < 2) {
       p.push("il faut au moins 2 réponses");
     } else {
@@ -285,6 +297,42 @@
     return msg;
   }
 
+  // Affiche un message écrit (courriel, demande du portail) : un en-tête
+  // (De, Objet…) puis le texte. entetes = [["De", "Mme X"], ["Objet", "…"]].
+  function ajouterFiche(entetes, corps) {
+    var html = '<div class="fiche-entete">';
+    entetes.forEach(function (e) {
+      html += "<div><span>" + esc(e[0]) + " :</span> " + esc(e[1]) + "</div>";
+    });
+    html += '</div><div class="fiche-corps">' + esc(corps) + "</div>";
+    var fiche = document.createElement("div");
+    fiche.className = "fiche";
+    fiche.innerHTML = html;
+    $("chat").appendChild(fiche);
+  }
+
+  // Présente la demande de l'utilisateur selon sa source.
+  async function afficherDemande(t) {
+    var qui = t.nom + (t.service ? " · " + t.service : "");
+    if (t.source === "Courriel") {
+      await attendre(animationsReduites ? 0 : 300);
+      ajouterFiche([["De", qui], ["Objet", t.objet]], t.demande);
+      return;
+    }
+    if (t.source === "Helpdesk") {
+      await attendre(animationsReduites ? 0 : 300);
+      ajouterFiche([["Demandeur", qui]], t.demande);
+      return;
+    }
+    // Téléphone, Direct, Autre (messagerie instantanée) : l'utilisateur « parle »
+    // ou « écrit », puis son message apparaît dans une bulle.
+    if (t.source === "Direct") ajouterMessage("systeme", t.nom + " passe à votre bureau.");
+    var ecrit = indicateurEcriture(initiales(t.nom));
+    await attendre(animationsReduites ? 0 : 900);
+    ecrit.remove();
+    ajouterMessage("user", t.demande, qui, initiales(t.nom));
+  }
+
   async function afficherTicket() {
     var s = etat.session[etat.index];
     var t = s.ticket;
@@ -299,11 +347,12 @@
     reinitialiserTicket(s);
     majBoutonEnregistrer();
 
-    // L'utilisateur « écrit », puis son message apparaît, puis les réponses possibles.
-    var ecrit = indicateurEcriture(initiales(t.nom));
-    await attendre(animationsReduites ? 0 : 900);
-    ecrit.remove();
-    ajouterMessage("user", t.demande, t.nom + (t.service ? " · " + t.service : ""), initiales(t.nom));
+    // Le panneau de gauche s'adapte à la source : titre et pastille.
+    $("titre-chat").textContent = t.source === "Autre" && t.canal ? t.canal : TITRES_SOURCE[t.source];
+    $("pastille-source").textContent = t.source;
+
+    // La demande apparaît, puis les réponses possibles.
+    await afficherDemande(t);
     await attendre(animationsReduites ? 0 : 300);
     afficherReponses(s);
   }
@@ -414,7 +463,8 @@
       var icone = rep.note === 2 ? "✓" : rep.note === 1 ? "~" : "✗";
 
       html += '<article class="r-ticket">' +
-        '<div class="r-tete"><h3>Appel ' + (i + 1) + " — " + esc(t.nom) + (t.service ? ", " + esc(t.service) : "") + "</h3>" +
+        '<div class="r-tete"><h3>Demande ' + (i + 1) + " — " + esc(t.nom) + (t.service ? ", " + esc(t.service) : "") +
+          " · " + esc(t.source === "Autre" && t.canal ? t.canal : t.source) + "</h3>" +
         '<span class="r-etoiles" aria-label="' + rep.note + ' étoile(s) sur 2">' + etoiles(rep.note) + "</span></div>" +
         '<p class="r-demande">« ' + esc(t.demande) + " »</p>" +
         '<p class="r-rep r-n' + rep.note + '"><strong>' + icone + " Réponse choisie :</strong> " + esc(rep.texte) +

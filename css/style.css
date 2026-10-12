@@ -154,6 +154,11 @@ textarea { resize: vertical; min-height: 90px; }
 .bulle { padding: 12px 14px; border-radius: 16px; background: var(--bulle-user); }
 .msg.user .bulle { border-top-left-radius: 4px; }
 .msg.tech .bulle { background: var(--bulle-tech); border-top-right-radius: 4px; }
+/* Message écrit (courriel, portail) : en-tête De / Objet, puis le texte */
+.fiche { background: var(--bulle-user); border-radius: 16px; padding: 12px 14px; animation: apparition .35s ease both; }
+.fiche-entete { display: grid; gap: 2px; font-size: .85rem; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--champ-bord); }
+.fiche-entete span { font-weight: 800; color: var(--discret); }
+.fiche-corps { white-space: pre-line; }
 .ecrit { display: inline-flex; gap: 4px; padding: 14px; }
 .ecrit i { width: 7px; height: 7px; border-radius: 50%; background: var(--discret); animation: point 1s infinite ease-in-out; }
 .ecrit i:nth-child(2) { animation-delay: .15s; } .ecrit i:nth-child(3) { animation-delay: .3s; }
