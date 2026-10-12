@@ -154,6 +154,11 @@ textarea { resize: vertical; min-height: 90px; }
 .bulle { padding: 12px 14px; border-radius: 16px; background: var(--bulle-user); }
 .msg.user .bulle { border-top-left-radius: 4px; }
 .msg.tech .bulle { background: var(--bulle-tech); border-top-right-radius: 4px; }
+/* Message écrit (courriel, portail) : en-tête De / Objet, puis le texte */
+.fiche { background: var(--bulle-user); border-radius: 16px; padding: 12px 14px; animation: apparition .35s ease both; }
+.fiche-entete { display: grid; gap: 2px; font-size: .85rem; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--champ-bord); }
+.fiche-entete span { font-weight: 800; color: var(--discret); }
+.fiche-corps { white-space: pre-line; }
 .ecrit { display: inline-flex; gap: 4px; padding: 14px; }
 .ecrit i { width: 7px; height: 7px; border-radius: 50%; background: var(--discret); animation: point 1s infinite ease-in-out; }
 .ecrit i:nth-child(2) { animation-delay: .15s; } .ecrit i:nth-child(3) { animation-delay: .3s; }
@@ -223,6 +228,19 @@ textarea { resize: vertical; min-height: 90px; }
 .r-glpi h4 { margin: 0 0 6px; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; color: var(--discret); }
 .r-glpi p { margin: 4px 0; }
 .r-attendu { color: var(--discret); font-size: .9rem; }
+.r-notes { display: flex; gap: 10px; flex-wrap: wrap; }
+.r-formateur { font-size: .8rem; font-style: italic; color: var(--discret); }
+
+/* Tableau des 5 critères notés du ticket : ✓ ou ✗ restent lisibles même sans couleur (impression) */
+.r-criteres { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: .88rem; }
+.r-criteres th, .r-criteres td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--champ-bord); overflow-wrap: break-word; }
+.r-criteres thead th { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: var(--discret); }
+.r-criteres tbody th { font-weight: 800; }
+.r-criteres .r-verdict { width: 1%; text-align: center; font-weight: 800; white-space: nowrap; }
+.r-ok { background: var(--ok-fond); }
+.r-ko { background: var(--ko-fond); }
+.r-ok .r-verdict { color: var(--ok); }
+.r-ko .r-verdict { color: var(--ko); }
 
 /* ---------- Animations ---------- */
 @keyframes apparition { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -242,6 +260,8 @@ textarea { resize: vertical; min-height: 90px; }
   .champs { grid-template-columns: 1fr; }
   .blob { width: 280px; height: 280px; }
   .msg { max-width: 100%; }
+  .r-criteres { font-size: .8rem; }
+  .r-criteres th, .r-criteres td { padding: 4px 5px; }
 }
 
 /* ---------- Impression : seul le rapport sort ---------- */

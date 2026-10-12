@@ -17,6 +17,16 @@
   var SOURCES = ["Téléphone", "Courriel", "Direct", "Helpdesk", "Autre"];
   var STATUTS = ["Nouveau", "En cours (attribué)", "En cours (planifié)", "En attente", "Résolu", "Clos"];
 
+  // Titre du panneau de gauche selon la source de la demande.
+  // Pour « Autre », le titre vient du champ canal du ticket (ex. « Message Teams »).
+  var TITRES_SOURCE = {
+    "Téléphone": "Appel entrant",
+    "Courriel": "Courriel reçu",
+    "Direct": "Visite au bureau",
+    "Helpdesk": "Demande via le portail",
+    "Autre": "Autre canal"
+  };
+
   // Priorité = f(urgence, impact). Reprend la matrice proposée par défaut dans GLPI
   // (Configuration > Générale > Assistance) : MATRICE[urgence][impact], valeurs de 1 à 5.
   var MATRICE = {
@@ -75,6 +85,23 @@
 
   /* ======================= Chargement des tickets ======================= */
 
+  // Dans attendu, chaque champ est soit une valeur ("Haute"), soit un tableau
+  // de valeurs acceptées (["Haute", "Très haute"]). On ramène tout à un tableau.
+  function valeursAcceptees(v) {
+    return Array.isArray(v) ? v : [v];
+  }
+
+  // Vérifie qu'un champ de attendu existe et n'utilise que des valeurs connues.
+  function verifierAttendu(p, champ, valeur, possibles) {
+    if (valeur == null || valeursAcceptees(valeur).length === 0) {
+      p.push("attendu." + champ + " manquant");
+      return;
+    }
+    valeursAcceptees(valeur).forEach(function (v) {
+      if (possibles.indexOf(v) === -1) p.push("attendu." + champ + " : « " + v + " » n'est pas une valeur possible");
+    });
+  }
+
   // Vérifie un ticket ; renvoie la liste des problèmes (vide si tout va bien).
   function problemesTicket(t) {
     var p = [];
@@ -82,6 +109,8 @@
     if (!t.id) p.push("id manquant");
     if (!t.nom) p.push("nom manquant");
     if (!t.demande) p.push("demande manquante");
+    if (SOURCES.indexOf(t.source) === -1) p.push("source invalide (valeurs possibles : " + SOURCES.join(", ") + ")");
+    if (t.source === "Courriel" && !t.objet) p.push("objet manquant (obligatoire pour un courriel)");
     if (!Array.isArray(t.reponses) || t.reponses.length < 2) {
       p.push("il faut au moins 2 réponses");
     } else {
@@ -90,6 +119,17 @@
         if (!r || [0, 1, 2].indexOf(r.note) === -1) p.push("réponse " + (i + 1) + " : note doit valoir 0, 1 ou 2");
       });
       if (!t.reponses.some(function (r) { return r && r.note === 2; })) p.push("aucune bonne réponse (note: 2)");
+    }
+    // attendu sert à noter le ticket : type et catégorie doivent exister dans
+    // les listes (catégories de config.js), urgence et impact dans NIVEAUX.
+    var a = t.attendu;
+    if (!a || typeof a !== "object") {
+      p.push("attendu manquant");
+    } else {
+      verifierAttendu(p, "type", a.type, TYPES);
+      verifierAttendu(p, "categorie", a.categorie, CATEGORIES);
+      verifierAttendu(p, "urgence", a.urgence, NIVEAUX);
+      verifierAttendu(p, "impact", a.impact, NIVEAUX);
     }
     return p;
   }
@@ -213,26 +253,28 @@
     afficherTicket();
   }
 
+  // Les 5 champs notés démarrent sur « — Choisir — » (valeur vide) : un apprenant
+  // qui ne touche à rien ne gagne aucun point. Un champ vide vaut 0 au critère.
+  var CHOISIR = { value: "", label: "— Choisir —" };
+
   function preparerFormulaireFixe() {
-    remplirSelect($("t-type"), TYPES);
-    remplirSelect($("t-source"), SOURCES);
-    remplirSelect($("t-categorie"), [{ value: "", label: "— Choisir —" }].concat(CATEGORIES));
+    remplirSelect($("t-type"), [CHOISIR].concat(TYPES));
+    remplirSelect($("t-source"), [CHOISIR].concat(SOURCES));
+    remplirSelect($("t-categorie"), [CHOISIR].concat(CATEGORIES));
     remplirSelect($("t-statut"), STATUTS);
     var niveaux = NIVEAUX.map(function (n, i) { return { value: i + 1, label: n }; });
-    remplirSelect($("t-urgence"), niveaux);
-    remplirSelect($("t-impact"), niveaux);
+    remplirSelect($("t-urgence"), [CHOISIR].concat(niveaux));
+    remplirSelect($("t-impact"), [CHOISIR].concat(niveaux));
     remplirSelect($("t-attribue"), [etat.apprenant + " (moi)"].concat(GROUPES));
   }
 
   function reinitialiserTicket(s) {
     var t = s.ticket;
     $("form-ticket").reset();
-    $("t-type").value = "Incident";
-    $("t-source").value = "Téléphone";
-    $("t-categorie").value = "";
+    ["t-type", "t-source", "t-categorie", "t-urgence", "t-impact"].forEach(function (id) {
+      $(id).value = "";
+    });
     $("t-statut").value = "Nouveau";
-    $("t-urgence").value = 3;
-    $("t-impact").value = 3;
     $("t-demandeur").value = t.nom + (t.service ? " (" + t.service + ")" : "");
     $("t-attribue").selectedIndex = 0;
     $("ticket-id").textContent = s.numero;
@@ -240,10 +282,21 @@
     majPriorite();
   }
 
+  // Priorité calculée par la matrice ; « — » tant que l'urgence ou l'impact manque.
+  function calculerPriorite(urgence, impact) {
+    if (!urgence || !impact) return "";
+    return NIVEAUX[MATRICE[urgence][impact] - 1];
+  }
+
   function majPriorite() {
-    var p = MATRICE[$("t-urgence").value][$("t-impact").value];
-    $("t-priorite").textContent = NIVEAUX[p - 1];
-    $("t-priorite").setAttribute("data-niveau", p);
+    var urg = $("t-urgence").value, imp = $("t-impact").value;
+    if (!urg || !imp) {
+      $("t-priorite").textContent = "—";
+      $("t-priorite").removeAttribute("data-niveau");
+      return;
+    }
+    $("t-priorite").textContent = calculerPriorite(urg, imp);
+    $("t-priorite").setAttribute("data-niveau", MATRICE[urg][imp]);
   }
   $("t-urgence").addEventListener("change", majPriorite);
   $("t-impact").addEventListener("change", majPriorite);
@@ -285,6 +338,42 @@
     return msg;
   }
 
+  // Affiche un message écrit (courriel, demande du portail) : un en-tête
+  // (De, Objet…) puis le texte. entetes = [["De", "Mme X"], ["Objet", "…"]].
+  function ajouterFiche(entetes, corps) {
+    var html = '<div class="fiche-entete">';
+    entetes.forEach(function (e) {
+      html += "<div><span>" + esc(e[0]) + " :</span> " + esc(e[1]) + "</div>";
+    });
+    html += '</div><div class="fiche-corps">' + esc(corps) + "</div>";
+    var fiche = document.createElement("div");
+    fiche.className = "fiche";
+    fiche.innerHTML = html;
+    $("chat").appendChild(fiche);
+  }
+
+  // Présente la demande de l'utilisateur selon sa source.
+  async function afficherDemande(t) {
+    var qui = t.nom + (t.service ? " · " + t.service : "");
+    if (t.source === "Courriel") {
+      await attendre(animationsReduites ? 0 : 300);
+      ajouterFiche([["De", qui], ["Objet", t.objet]], t.demande);
+      return;
+    }
+    if (t.source === "Helpdesk") {
+      await attendre(animationsReduites ? 0 : 300);
+      ajouterFiche([["Demandeur", qui]], t.demande);
+      return;
+    }
+    // Téléphone, Direct, Autre (messagerie instantanée) : l'utilisateur « parle »
+    // ou « écrit », puis son message apparaît dans une bulle.
+    if (t.source === "Direct") ajouterMessage("systeme", t.nom + " passe à votre bureau.");
+    var ecrit = indicateurEcriture(initiales(t.nom));
+    await attendre(animationsReduites ? 0 : 900);
+    ecrit.remove();
+    ajouterMessage("user", t.demande, qui, initiales(t.nom));
+  }
+
   async function afficherTicket() {
     var s = etat.session[etat.index];
     var t = s.ticket;
@@ -299,11 +388,12 @@
     reinitialiserTicket(s);
     majBoutonEnregistrer();
 
-    // L'utilisateur « écrit », puis son message apparaît, puis les réponses possibles.
-    var ecrit = indicateurEcriture(initiales(t.nom));
-    await attendre(animationsReduites ? 0 : 900);
-    ecrit.remove();
-    ajouterMessage("user", t.demande, t.nom + (t.service ? " · " + t.service : ""), initiales(t.nom));
+    // Le panneau de gauche s'adapte à la source : titre et pastille.
+    $("titre-chat").textContent = t.source === "Autre" && t.canal ? t.canal : TITRES_SOURCE[t.source];
+    $("pastille-source").textContent = t.source;
+
+    // La demande apparaît, puis les réponses possibles.
+    await afficherDemande(t);
     await attendre(animationsReduites ? 0 : 300);
     afficherReponses(s);
   }
@@ -363,17 +453,18 @@
     if ($("btn-enregistrer").disabled) return;
 
     var s = etat.session[etat.index];
-    var urg = Number($("t-urgence").value), imp = Number($("t-impact").value);
+    // Un champ laissé sur « — Choisir — » est enregistré vide ("").
+    var urg = $("t-urgence").value, imp = $("t-impact").value;
     s.saisie = {
       titre: $("t-titre").value.trim(),
       description: $("t-description").value.trim(),
       type: $("t-type").value,
       source: $("t-source").value,
-      categorie: $("t-categorie").value || "(non renseignée)",
+      categorie: $("t-categorie").value,
       statut: $("t-statut").value,
-      urgence: NIVEAUX[urg - 1],
-      impact: NIVEAUX[imp - 1],
-      priorite: NIVEAUX[MATRICE[urg][imp] - 1],
+      urgence: urg ? NIVEAUX[urg - 1] : "",
+      impact: imp ? NIVEAUX[imp - 1] : "",
+      priorite: calculerPriorite(urg, imp),
       demandeur: $("t-demandeur").value.trim(),
       attribue: $("t-attribue").value
     };
@@ -389,11 +480,59 @@
 
   /* ======================= Rapport ======================= */
 
+  // Note des réponses : somme des étoiles (2 par ticket au maximum).
   function score() {
     return etat.session.reduce(function (total, s) { return total + s.ticket.reponses[s.choix].note; }, 0);
   }
 
   function etoiles(note) { return "★".repeat(note) + "☆".repeat(2 - note); }
+
+  // Valeur d'un champ du ticket telle qu'affichée dans le rapport.
+  function afficheChamp(v) { return v ? v : "(non renseigné)"; }
+
+  /* ---------- Note du ticket ---------- */
+
+  // Les 5 critères notés d'un ticket saisi. Pour chacun : la valeur saisie,
+  // les valeurs acceptées, et ok = true si la saisie en fait partie.
+  // La source est un fait du scénario : une seule valeur acceptée, celle du ticket.
+  // Un champ laissé vide n'est jamais juste.
+  function criteresTicket(s) {
+    var t = s.ticket, g = s.saisie, a = t.attendu;
+    var criteres = [
+      { nom: "Type", saisi: g.type, acceptes: valeursAcceptees(a.type) },
+      { nom: "Source", saisi: g.source, acceptes: [t.source] },
+      { nom: "Catégorie", saisi: g.categorie, acceptes: valeursAcceptees(a.categorie) },
+      { nom: "Urgence", saisi: g.urgence, acceptes: valeursAcceptees(a.urgence) },
+      { nom: "Impact", saisi: g.impact, acceptes: valeursAcceptees(a.impact) }
+    ];
+    criteres.forEach(function (c) {
+      c.ok = c.saisi !== "" && c.acceptes.indexOf(c.saisi) !== -1;
+    });
+    return criteres;
+  }
+
+  // Nombre de critères justes sur un ticket (de 0 à 5).
+  function criteresJustes(s) {
+    return criteresTicket(s).filter(function (c) { return c.ok; }).length;
+  }
+
+  // Note d'un ticket sur 2 : (critères justes / 5) × 2, soit 0,4 point par critère.
+  function noteTicket(s) {
+    return criteresJustes(s) / 5 * 2;
+  }
+
+  // Note des tickets de la session (sur 10 pour 5 tickets). On additionne
+  // d'abord les critères justes (nombres entiers) pour éviter les erreurs
+  // d'arrondi des nombres à virgule.
+  function scoreTickets() {
+    var justes = etat.session.reduce(function (total, s) { return total + criteresJustes(s); }, 0);
+    return justes / 5 * 2;
+  }
+
+  // Écrit une note à la française avec une décimale : 8.4 -> « 8,4 ».
+  function noteFr(n) {
+    return n.toFixed(1).replace(".", ",");
+  }
 
   // Construit le contenu du rapport (utilisé à l'écran, à l'impression et dans le fichier téléchargé).
   function contenuRapport() {
@@ -404,17 +543,24 @@
       "<p><strong>Apprenant :</strong> " + esc(etat.apprenant) + "</p>" +
       "<p><strong>Date :</strong> " + esc(etat.debut.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })) +
       " · <strong>Durée :</strong> " + duree + " min</p>" +
-      '<p class="r-legende">★★ bonne réponse · ★☆ en partie juste · ☆☆ fausse. Les tickets saisis ne sont pas notés : ils sont à commenter par le formateur.</p>' +
+      '<p class="r-legende">Réponses : ★★ bonne réponse · ★☆ en partie juste · ☆☆ fausse.<br>' +
+      "Ticket : 5 critères (type, source, catégorie, urgence, impact), 0,4 point par critère juste ; " +
+      "un champ non renseigné vaut 0. Titre, description, statut et attribution sont à évaluer par le formateur.</p>" +
       "</div>" +
-      '<div class="r-note">Note<strong>' + score() + " / " + max + "</strong></div></div>";
+      // Deux notes séparées : l'une ne compense pas l'autre.
+      '<div class="r-notes">' +
+      '<div class="r-note">Réponses<strong>' + score() + " / " + max + "</strong></div>" +
+      '<div class="r-note">Ticket<strong>' + noteFr(scoreTickets()) + " / " + max + "</strong></div>" +
+      "</div></div>";
 
     etat.session.forEach(function (s, i) {
       var t = s.ticket, rep = t.reponses[s.choix], bonne = t.reponses.filter(function (r) { return r.note === 2; })[0];
-      var g = s.saisie, a = t.attendu || {};
+      var g = s.saisie;
       var icone = rep.note === 2 ? "✓" : rep.note === 1 ? "~" : "✗";
 
       html += '<article class="r-ticket">' +
-        '<div class="r-tete"><h3>Appel ' + (i + 1) + " — " + esc(t.nom) + (t.service ? ", " + esc(t.service) : "") + "</h3>" +
+        '<div class="r-tete"><h3>Demande ' + (i + 1) + " — " + esc(t.nom) + (t.service ? ", " + esc(t.service) : "") +
+          " · " + esc(t.source === "Autre" && t.canal ? t.canal : t.source) + "</h3>" +
         '<span class="r-etoiles" aria-label="' + rep.note + ' étoile(s) sur 2">' + etoiles(rep.note) + "</span></div>" +
         '<p class="r-demande">« ' + esc(t.demande) + " »</p>" +
         '<p class="r-rep r-n' + rep.note + '"><strong>' + icone + " Réponse choisie :</strong> " + esc(rep.texte) +
@@ -424,16 +570,24 @@
       }
       if (t.pointCle) html += '<p class="r-cle"><strong>Point clé :</strong> ' + esc(t.pointCle) + "</p>";
 
-      html += '<div class="r-glpi"><h4>Ticket saisi ' + esc(s.numero) + "</h4>" +
+      // Ticket saisi : titre et description tels quels (non notés), puis le
+      // tableau des 5 critères notés, puis les champs laissés au formateur.
+      html += '<div class="r-glpi"><h4>Ticket saisi ' + esc(s.numero) + " — " + noteFr(noteTicket(s)) + " / 2</h4>" +
+        '<p class="r-formateur">Titre et description : à évaluer par le formateur</p>' +
         "<p><strong>" + esc(g.titre) + "</strong></p>" +
-        "<p>" + [g.type, g.categorie, "Urgence " + g.urgence.toLowerCase(), "Impact " + g.impact.toLowerCase(),
-          "Priorité " + g.priorite.toLowerCase(), g.statut, "Source : " + g.source, "Attribué à : " + g.attribue].map(esc).join(" · ") + "</p>" +
-        "<p>" + (g.description ? esc(g.description) : "<em>(pas de description)</em>") + "</p>";
-      if (a.type) {
-        html += '<p class="r-attendu"><strong>Repère attendu :</strong> ' +
-          esc([a.type, a.categorie, "Urgence " + String(a.urgence).toLowerCase(), "Impact " + String(a.impact).toLowerCase()].join(" · ")) + "</p>";
-      }
-      html += "</div></article>";
+        "<p>" + (g.description ? esc(g.description) : "<em>(pas de description)</em>") + "</p>" +
+        '<table class="r-criteres"><thead><tr><th scope="col">Critère</th><th scope="col">Saisi</th>' +
+        '<th scope="col">Attendu</th><th scope="col" class="r-verdict">Résultat</th></tr></thead><tbody>';
+      criteresTicket(s).forEach(function (c) {
+        html += '<tr class="' + (c.ok ? "r-ok" : "r-ko") + '"><th scope="row">' + esc(c.nom) + "</th>" +
+          "<td>" + esc(afficheChamp(c.saisi)) + "</td>" +
+          "<td>" + esc(c.acceptes.join(" ou ")) + "</td>" +
+          '<td class="r-verdict">' + (c.ok ? "✓" : "✗") + "</td></tr>";
+      });
+      html += "</tbody></table>" +
+        '<p class="r-attendu">Non noté : priorité ' + esc(afficheChamp(g.priorite).toLowerCase()) +
+        " · statut " + esc(g.statut.toLowerCase()) + " · attribué à " + esc(g.attribue) + "</p>" +
+        "</div></article>";
     });
     return html;
   }
@@ -464,6 +618,13 @@
     ".r-glpi{margin-top:12px;padding:12px 14px;border-radius:12px;border:1.5px solid #E6DECF}" +
     ".r-glpi h4{margin:0 0 6px;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:#6B6358}.r-glpi p{margin:4px 0}" +
     ".r-attendu{color:#6B6358;font-size:.9rem}" +
+    ".r-notes{display:flex;gap:10px;flex-wrap:wrap}.r-formateur{font-size:.8rem;font-style:italic;color:#6B6358}" +
+    ".r-criteres{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:.88rem}" +
+    ".r-criteres th,.r-criteres td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid #E6DECF;overflow-wrap:break-word}" +
+    ".r-criteres thead th{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:#6B6358}.r-criteres tbody th{font-weight:800}" +
+    ".r-criteres .r-verdict{width:1%;text-align:center;font-weight:800;white-space:nowrap}" +
+    ".r-ok{background:#E6F0E6}.r-ko{background:#F7E6E1}.r-ok .r-verdict{color:#4F7D52}.r-ko .r-verdict{color:#B4553C}" +
+    "@media (max-width:600px){.page{padding:18px}.r-criteres{font-size:.8rem}.r-criteres th,.r-criteres td{padding:4px 5px}}" +
     "@media print{body{background:#fff;padding:0}.page{box-shadow:none;padding:0}}";
 
   function nomFichier() {
