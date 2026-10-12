@@ -16,10 +16,11 @@ window.TICKETS = [
     theme: "Réseau",
     nom: "Karim",
     service: "logistique",
+    source: "Direct",
     demande: "J'ai un petit globe barré en bas de l'écran. Plus rien ne marche, ni Internet ni le dossier partagé.",
     reponses: [
       { note: 2, texte: "Le globe barré signifie que votre poste n'est plus connecté au réseau. Vos collègues ont-ils le même problème ? Et vous êtes branché par câble ou en Wi-Fi ?" },
-      { note: 1, texte: "Regardez derrière votre ordinateur : débranchez le câble réseau, attendez quelques secondes, rebranchez-le bien à fond, puis dites-moi si le globe barré disparaît." },
+      { note: 1, texte: "Regardez derrière votre ordinateur en rentrant : débranchez le câble réseau, attendez quelques secondes, rebranchez-le à fond, puis revenez me dire si le globe a disparu." },
       { note: 0, texte: "Pas de souci, je prends la main sur votre poste à distance et je vous renouvelle l'adresse IP. Ne touchez à rien pendant quelques minutes, je m'occupe de tout." },
       { note: 0, texte: "Si le dossier partagé ne répond plus non plus, c'est forcément le serveur qui est tombé. Je préviens tout de suite l'équipe infrastructure, ils vont regarder ça en priorité." }
     ],
@@ -31,10 +32,12 @@ window.TICKETS = [
     theme: "PC lent",
     nom: "M. Bernard",
     service: "directeur",
+    source: "Courriel",
+    objet: "PC très lent depuis lundi",
     demande: "Mon PC rame depuis lundi, c'est insupportable. Et je vous préviens, je n'ai pas le temps qu'on me le prenne une demi-journée.",
     reponses: [
       { note: 2, texte: "Je vais faire au plus court. C'est lent tout le temps ou sur un logiciel précis ? Si vous êtes d'accord, je prends la main à distance deux minutes." },
-      { note: 1, texte: "Commencez par redémarrer complètement votre PC, ça règle une bonne partie des lenteurs. Si le problème continue cet après-midi, rappelez-moi et je passerai le voir." },
+      { note: 1, texte: "Commencez par redémarrer complètement votre PC, ça règle une bonne partie des lenteurs. Si le problème continue cet après-midi, répondez-moi et je passerai le voir." },
       { note: 0, texte: "Ça peut être un virus, c'est souvent le cas quand un PC ralentit d'un coup. Je lance tout de suite une analyse antivirus complète à distance, laissez-la tourner jusqu'au bout." },
       { note: 0, texte: "Les lenteurs viennent presque toujours du navigateur. Vous avez sûrement trop d'onglets ouverts en même temps : fermez ceux qui ne servent pas et ça ira beaucoup mieux." }
     ],
@@ -46,6 +49,7 @@ window.TICKETS = [
     theme: "Écran noir",
     nom: "Mme Petit",
     service: "accueil",
+    source: "Téléphone",
     demande: "Mon écran est tout noir, j'ai rien fait je vous jure, j'ai juste allumé comme d'habitude.",
     reponses: [
       { note: 2, texte: "Ne vous inquiétez pas, ce n'est pas votre faute. Est-ce que vous voyez une petite lumière allumée sur l'écran ? Et sur l'ordinateur ?" },
@@ -61,6 +65,8 @@ window.TICKETS = [
     theme: "Imprimante",
     nom: "Lucas",
     service: "stagiaire RH",
+    source: "Courriel",
+    objet: "L'imprimante n'imprime plus",
     demande: "L'imprimante ne sort rien. J'ai lancé mon document quatre fois.",
     reponses: [
       { note: 2, texte: "Est-ce que vos collègues arrivent à imprimer sur cette imprimante ? Et y a-t-il un message ou un voyant orange sur son petit écran ?" },
@@ -76,6 +82,8 @@ window.TICKETS = [
     theme: "OneDrive",
     nom: "Mme Garnier",
     service: "cheffe de projet",
+    source: "Courriel",
+    objet: "Fichiers pas à jour au bureau",
     demande: "J'ai modifié mes fichiers hier soir chez moi, et au bureau ce matin ils ne sont pas à jour. Je les ai perdus ?",
     reponses: [
       { note: 2, texte: "Vos fichiers ne sont sûrement pas perdus. Voyez-vous l'icône de nuage OneDrive en bas à droite ? Y a-t-il une croix ou des flèches dessus ?" },
@@ -91,6 +99,7 @@ window.TICKETS = [
     theme: "Mail suspect",
     nom: "Thomas",
     service: "comptabilité",
+    source: "Téléphone",
     demande: "J'ai reçu un mail de la banque qui demandait de confirmer mes identifiants… J'ai cliqué et j'ai tapé mon mot de passe. C'est grave ?",
     reponses: [
       { note: 2, texte: "Vous avez bien fait d'appeler tout de suite. On change votre mot de passe maintenant, et je signale le mail à la sécurité. Surtout, ne le supprimez pas." },
@@ -106,6 +115,7 @@ window.TICKETS = [
     theme: "Compte verrouillé",
     nom: "Mme N'Diaye",
     service: "RH",
+    source: "Téléphone",
     demande: "Ça me dit que mon compte est verrouillé. J'ai essayé plusieurs fois, je suis sûre que mon mot de passe est bon.",
     reponses: [
       { note: 2, texte: "Je vérifie d'abord votre identité, puis je déverrouille votre compte. Au passage, la touche Verr. Maj était-elle activée quand vous avez tapé ?" },
@@ -121,6 +131,7 @@ window.TICKETS = [
     theme: "Logiciel",
     nom: "M. Roche",
     service: "communication",
+    source: "Helpdesk",
     demande: "Il me faut Photoshop installé aujourd'hui, j'ai une plaquette à rendre demain.",
     reponses: [
       { note: 2, texte: "Je note votre demande. Un logiciel payant demande une validation et une licence : je la transmets au service concerné et je vous tiens informé." },
@@ -136,6 +147,8 @@ window.TICKETS = [
     theme: "Panne matérielle",
     nom: "M. Lambert",
     service: "atelier",
+    source: "Courriel",
+    objet: "Bruit bizarre de mon PC",
     demande: "Mon PC fait un bruit de clic-clic depuis ce matin, et il met dix minutes à démarrer.",
     reponses: [
       { note: 2, texte: "Ce bruit peut venir du disque dur. Avez-vous des fichiers importants enregistrés seulement sur ce poste ? En attendant, évitez de l'éteindre." },
@@ -151,12 +164,13 @@ window.TICKETS = [
     theme: "Utilisateur en colère",
     nom: "M. Vasseur",
     service: "commercial",
+    source: "Direct",
     demande: "C'est la troisième fois ce mois-ci qu'Outlook plante ! Vous servez à quoi, au service informatique ?",
     reponses: [
       { note: 2, texte: "Trois fois en un mois, je comprends que ce soit pénible. Je reprends l'historique de vos tickets. Que se passe-t-il exactement quand il plante ?" },
       { note: 1, texte: "Je suis désolé pour la gêne. Fermez Outlook, puis relancez-le en mode sans échec : si ça ne plante plus, on saura que le problème vient d'un complément." },
       { note: 0, texte: "Puisque ça revient sans arrêt, on va arrêter les rustines : je vous désinstalle et réinstalle toute la suite Office ce midi, comme ça on repart sur une base propre." },
-      { note: 0, grossiere: true, texte: "Je comprends votre agacement, mais je ne continuerai pas cet échange si vous me parlez sur ce ton. Rappelez-moi quand vous serez plus calme." }
+      { note: 0, grossiere: true, texte: "Je comprends votre agacement, mais je ne continuerai pas cet échange si vous me parlez sur ce ton. Revenez me voir quand vous serez plus calme." }
     ],
     pointCle: "accueillir l'émotion, puis traiter la récurrence. Un incident qui revient demande de consulter l'historique, pas d'appliquer une nouvelle rustine.",
     attendu: { type: "Incident", categorie: "Messagerie et collaboratif", urgence: "Moyenne", impact: "Basse" }
@@ -166,6 +180,7 @@ window.TICKETS = [
     theme: "Rançongiciel",
     nom: "Mme Fabre",
     service: "secrétariat",
+    source: "Téléphone",
     demande: "Tous mes fichiers ont une extension bizarre, \".locked\", et il y a un message qui demande de payer en bitcoins. Je fais quoi ?",
     reponses: [
       { note: 2, texte: "Ne touchez plus à rien et débranchez le câble réseau de votre PC, sans l'éteindre. Je préviens immédiatement l'équipe sécurité, restez près de votre poste." },
@@ -181,9 +196,10 @@ window.TICKETS = [
     theme: "Accessibilité",
     nom: "Mme Caron",
     service: "juridique",
+    source: "Direct",
     demande: "Depuis la mise à jour d'hier, tout est écrit en tout petit. Avec ma vue, je n'arrive plus à lire mes dossiers.",
     reponses: [
-      { note: 2, texte: "La mise à jour a sûrement remis l'affichage par défaut. Je vous propose de prendre la main à distance pour rétablir vos réglages, en vous expliquant chaque étape. Ça vous va ?" },
+      { note: 2, texte: "La mise à jour a sûrement remis l'affichage par défaut. Je vous accompagne à votre poste pour rétablir vos réglages, en vous expliquant chaque étape. Ça vous va ?" },
       { note: 1, texte: "Appuyez plusieurs fois sur Ctrl et la touche plus en même temps : le texte va grossir dans la fenêtre que vous utilisez." },
       { note: 0, texte: "Vous pouvez utiliser la loupe de Windows en attendant, avec la touche Windows et plus. Vous saviez qu'elle existait ? Elle agrandit tout l'écran, c'est très pratique." },
       { note: 0, texte: "Pour vous, le plus simple serait un écran plus grand. Je fais une demande de matériel, vous devriez le recevoir d'ici quelques semaines." }
@@ -196,6 +212,7 @@ window.TICKETS = [
     theme: "VPN",
     nom: "M. Girard",
     service: "comptabilité",
+    source: "Téléphone",
     demande: "Je suis chez moi et le VPN refuse de se connecter. Il me met \"délai d'attente dépassé\".",
     reponses: [
       { note: 2, texte: "Est-ce que votre connexion Internet fonctionne normalement chez vous, sur un site web par exemple ? Et le VPN marchait-il encore la semaine dernière ?" },
@@ -211,10 +228,12 @@ window.TICKETS = [
     theme: "Nouvel arrivant",
     nom: "Mme Robin",
     service: "responsable logistique",
+    source: "Courriel",
+    objet: "Arrivée de Julien Martin lundi",
     demande: "J'ai quelqu'un qui arrive lundi. Vous pouvez lui créer un compte et préparer un PC ? Il s'appelle Julien Martin.",
     reponses: [
       { note: 2, texte: "Bien sûr. Pour lancer la création, il me faut la validation RH de son arrivée : la fiche a-t-elle été envoyée ? Je prépare ensuite son compte et son poste." },
-      { note: 1, texte: "Je m'en occupe. Donnez-moi son nom, son service et sa date d'arrivée, je crée son compte dès aujourd'hui et je lui prépare un poste." },
+      { note: 1, texte: "Je m'en occupe. Indiquez-moi son nom, son service et sa date d'arrivée, je crée son compte dès aujourd'hui et je lui prépare un poste." },
       { note: 0, texte: "Pas de problème, je lui crée un compte avec les mêmes droits que vous. Comme ça, il aura accès à tout ce dont votre équipe a besoin dès lundi." },
       { note: 0, grossiere: true, texte: "En attendant lundi, il peut utiliser votre session. Donnez-lui votre mot de passe, ce sera plus simple que de tout créer dans l'urgence." }
     ],
@@ -226,6 +245,7 @@ window.TICKETS = [
     theme: "Panne collective",
     nom: "M. Dubois",
     service: "chef d'équipe facturation",
+    source: "Téléphone",
     demande: "Personne dans le service n'arrive à ouvrir le logiciel de facturation. On est huit à être bloqués.",
     reponses: [
       { note: 2, texte: "Huit personnes bloquées, je traite ça en priorité. Le message d'erreur est-il le même pour tout le monde ? J'ouvre un incident et je préviens l'équipe concernée." },
@@ -241,12 +261,13 @@ window.TICKETS = [
     theme: "Clé USB trouvée",
     nom: "Inès",
     service: "accueil",
-    demande: "J'ai trouvé une clé USB sur le parking. Je l'ai branchée pour voir à qui elle était, mais il y a juste un fichier \"Salaires 2026\".",
+    source: "Direct",
+    demande: "J'ai trouvé cette clé USB sur le parking. Je l'ai branchée sur mon poste pour voir à qui elle était, mais il y a juste un fichier \"Salaires 2026\".",
     reponses: [
-      { note: 2, texte: "Merci de m'avoir appelé. Retirez la clé et n'ouvrez surtout pas ce fichier. Je viens la récupérer et je fais vérifier votre poste." },
-      { note: 1, texte: "Retirez la clé tout de suite et déposez-la au service informatique. À l'avenir, ne branchez jamais une clé dont vous ne connaissez pas l'origine." },
+      { note: 2, texte: "Merci de me l'avoir apportée. Je la garde sans l'ouvrir. Avez-vous ouvert ce fichier ? Je viens avec vous faire vérifier votre poste." },
+      { note: 1, texte: "Merci, je garde la clé et je la transmets à la sécurité. À l'avenir, ne branchez jamais une clé dont vous ne connaissez pas l'origine." },
       { note: 0, texte: "Si l'antivirus ne s'est pas déclenché quand vous l'avez branchée, c'est qu'elle est saine. Vous pouvez la déposer aux objets trouvés de l'accueil." },
-      { note: 0, grossiere: true, texte: "Ouvrez le fichier, il y aura peut-être le nom du propriétaire dedans. Comme ça, vous pourrez la lui rendre directement sans passer par nous." }
+      { note: 0, grossiere: true, texte: "Rebranchez-la et ouvrez le fichier, il y aura peut-être le nom du propriétaire dedans. Vous pourrez la lui rendre directement sans passer par nous." }
     ],
     pointCle: "une clé abandonnée est un mode d'attaque classique. On isole, on vérifie le poste, et on remercie l'utilisatrice d'avoir signalé.",
     attendu: { type: "Incident", categorie: "Sécurité", urgence: "Haute", impact: "Moyenne" }
@@ -256,6 +277,8 @@ window.TICKETS = [
     theme: "Micro Teams",
     nom: "Mme Leclerc",
     service: "RH",
+    source: "Autre",
+    canal: "Message Teams",
     demande: "Ma réunion Teams commence dans cinq minutes et personne ne m'entend ! Le micro marchait hier.",
     reponses: [
       { note: 2, texte: "On fait vite. Avez-vous un casque branché ? Dans Teams, cliquez sur les trois points, puis Paramètres de l'appareil : quel micro est sélectionné ?" },
@@ -271,6 +294,7 @@ window.TICKETS = [
     theme: "Disque plein",
     nom: "M. Henry",
     service: "bureau d'études",
+    source: "Helpdesk",
     demande: "J'ai un message \"espace disque insuffisant\" et je ne peux plus enregistrer mes plans.",
     reponses: [
       { note: 2, texte: "Je regarde avec vous ce qui prend de la place. Vos plans sont-ils enregistrés sur le PC ou sur le réseau ? Je peux prendre la main ?" },
@@ -286,6 +310,7 @@ window.TICKETS = [
     theme: "Ingénierie sociale",
     nom: "M. Vidal",
     service: "directeur financier",
+    source: "Téléphone",
     demande: "Bonjour, ici M. Vidal, directeur financier. Ma secrétaire est bloquée : réinitialisez son mot de passe et donnez-le-moi, c'est urgent.",
     reponses: [
       { note: 2, texte: "Je comprends l'urgence. Pour des raisons de sécurité, je dois réinitialiser ce mot de passe avec votre secrétaire elle-même. Peut-elle m'appeler depuis son poste ?" },
@@ -301,9 +326,10 @@ window.TICKETS = [
     theme: "Double écran",
     nom: "Mme Morin",
     service: "marketing",
+    source: "Helpdesk",
     demande: "On a changé de bureau hier, et mon deuxième écran reste noir. Le premier marche très bien.",
     reponses: [
-      { note: 2, texte: "Votre ordinateur est-il branché sur une station d'accueil ? Vérifions ensemble que le câble du deuxième écran est bien enfoncé des deux côtés et que l'écran est allumé." },
+      { note: 2, texte: "Votre PC est-il branché sur une station d'accueil ? Pouvez-vous vérifier que le câble du deuxième écran est bien enfoncé des deux côtés et que l'écran est allumé ?" },
       { note: 1, texte: "Appuyez en même temps sur la touche Windows et P, puis choisissez « Étendre ». L'affichage est peut-être revenu sur un seul écran." },
       { note: 0, texte: "Le déménagement a dû abîmer l'écran. Je vous en commande un neuf, et en attendant vous pourrez travailler sur un seul écran quelques jours." },
       { note: 0, grossiere: true, texte: "Un double écran, c'est du confort, pas une priorité. Je regarderai quand j'aurai le temps, travaillez sur un seul écran en attendant." }
@@ -316,6 +342,7 @@ window.TICKETS = [
     theme: "Dossier supprimé",
     nom: "Mme Lemoine",
     service: "administration",
+    source: "Direct",
     demande: "J'ai supprimé par erreur le dossier \"Contrats\" sur le partage commun. Il y avait tout le travail de l'équipe dedans !",
     reponses: [
       { note: 2, texte: "Pas de panique, le partage est sauvegardé. Vous souvenez-vous à peu près de l'heure de la suppression ? Je lance la restauration et je vous préviens dès que c'est fait." },
@@ -331,6 +358,8 @@ window.TICKETS = [
     theme: "Fichier verrouillé",
     nom: "M. Perrin",
     service: "comptabilité",
+    source: "Courriel",
+    objet: "Fichier budget verrouillé",
     demande: "Excel me dit que le fichier budget est \"verrouillé par un autre utilisateur\". Mais tout le monde dit qu'il ne l'a pas ouvert.",
     reponses: [
       { note: 2, texte: "Le verrou reste parfois après une fermeture brutale. Quel nom d'utilisateur Excel affiche-t-il ? Je vérifie avec cette personne avant de libérer le fichier." },
@@ -346,6 +375,7 @@ window.TICKETS = [
     theme: "Wi-Fi en salle de réunion",
     nom: "Mme Benali",
     service: "commerciale",
+    source: "Téléphone",
     demande: "En salle de réunion, mon portable ne trouve pas le Wi-Fi. Au bureau, ça marche très bien.",
     reponses: [
       { note: 2, texte: "Dans la liste des réseaux, voyez-vous celui de l'entreprise ? Et le mode avion n'est-il pas activé, par hasard ? Il y a un petit avion en bas à droite." },
@@ -361,6 +391,7 @@ window.TICKETS = [
     theme: "Demande d'accès",
     nom: "M. Fontaine",
     service: "chargé de mission",
+    source: "Helpdesk",
     demande: "J'ai besoin d'accéder au dossier partagé de la direction pour un projet. Vous pouvez me donner les droits ?",
     reponses: [
       { note: 2, texte: "Je prends votre demande. L'accès à ce dossier doit être validé par son responsable : je lui transmets, et je vous ouvre les droits dès qu'il a donné son accord." },
@@ -376,6 +407,7 @@ window.TICKETS = [
     theme: "Mail au mauvais destinataire",
     nom: "Mme Gauthier",
     service: "RH",
+    source: "Téléphone",
     demande: "J'ai envoyé un tableau avec les salaires de l'équipe au mauvais destinataire, quelqu'un d'extérieur. Je fais quoi ?",
     reponses: [
       { note: 2, texte: "Vous avez bien fait d'appeler vite. Essayez de rappeler le message si c'est possible, et je signale l'incident à la sécurité et au référent données personnelles." },
@@ -391,6 +423,7 @@ window.TICKETS = [
     theme: "Boîte mail pleine",
     nom: "M. Charpentier",
     service: "achats",
+    source: "Helpdesk",
     demande: "Outlook me dit que ma boîte aux lettres est pleine, je ne peux plus envoyer de mails.",
     reponses: [
       { note: 2, texte: "Je vais regarder avec vous ce qui prend le plus de place. Vous gardez beaucoup de mails avec des pièces jointes ? On peut aussi archiver les plus anciens." },
@@ -406,6 +439,7 @@ window.TICKETS = [
     theme: "Mise à jour bloquée",
     nom: "Mme Barbier",
     service: "accueil",
+    source: "Téléphone",
     demande: "Mon PC affiche \"Ne pas éteindre l'ordinateur, mise à jour en cours\" depuis une heure. Je peux l'éteindre ?",
     reponses: [
       { note: 2, texte: "Non, surtout pas pour l'instant. Le pourcentage avance-t-il, même lentement ? Et le petit voyant du disque clignote-t-il sur l'ordinateur ?" },
@@ -421,6 +455,7 @@ window.TICKETS = [
     theme: "Vidéoprojecteur",
     nom: "M. Lefèvre",
     service: "directeur commercial",
+    source: "Téléphone",
     demande: "Le vidéoprojecteur de la salle affiche \"Aucun signal\", et mes clients arrivent dans dix minutes !",
     reponses: [
       { note: 2, texte: "Dix minutes, c'est jouable. Votre portable est-il branché au câble HDMI de la salle ? Appuyez sur Windows et P, puis choisissez « Dupliquer »." },
@@ -436,6 +471,7 @@ window.TICKETS = [
     theme: "Clavier",
     nom: "Mme Rousseau",
     service: "comptable",
+    source: "Direct",
     demande: "Mon clavier ne tape plus rien. La souris marche, mais le clavier, plus rien du tout.",
     reponses: [
       { note: 2, texte: "On va vérifier ensemble. Votre clavier a-t-il un fil, ou est-il sans fil ? S'il est sans fil, les piles sont peut-être simplement à changer." },
@@ -451,6 +487,8 @@ window.TICKETS = [
     theme: "Alerte de certificat",
     nom: "M. Marchand",
     service: "achats",
+    source: "Courriel",
+    objet: "Alerte sur le site du fournisseur",
     demande: "Quand je vais sur le site de notre fournisseur, le navigateur affiche \"Votre connexion n'est pas privée\". Je peux continuer quand même ?",
     reponses: [
       { note: 2, texte: "Non, ne continuez pas pour l'instant et ne saisissez rien sur ce site. Vous y êtes allé par un lien reçu par mail, ou par vos favoris habituels ?" },
