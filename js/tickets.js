@@ -25,7 +25,12 @@ window.TICKETS = [
       { note: 0, texte: "Si le dossier partagé ne répond plus non plus, c'est forcément le serveur qui est tombé. Je préviens tout de suite l'équipe infrastructure, ils vont regarder ça en priorité." }
     ],
     pointCle: "un poste déconnecté n'est pas joignable à distance, et un seul poste touché ne veut pas dire panne serveur.",
-    attendu: { type: "Incident", categorie: "Réseau", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Réseau",
+      urgence: "Haute",
+      impact: "Basse"
+    }
   },
   {
     id: "t02-pc-lent",
@@ -42,7 +47,12 @@ window.TICKETS = [
       { note: 0, texte: "Les lenteurs viennent presque toujours du navigateur. Vous avez sûrement trop d'onglets ouverts en même temps : fermez ceux qui ne servent pas et ça ira beaucoup mieux." }
     ],
     pointCle: "respecter la contrainte de l'utilisateur tout en diagnostiquant. Une analyse complète bloquerait son poste pendant des heures.",
-    attendu: { type: "Incident", categorie: "Poste de travail", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Poste de travail", "Matériel"],
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t03-ecran-noir",
@@ -58,7 +68,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Un écran ne devient pas noir tout seul, ça arrive en général après une fausse manipulation. Réfléchissez bien : qu'est-ce que vous avez touché en arrivant ce matin ?" }
     ],
     pointCle: "rassurer, puis utiliser des repères visuels simples. Le vocabulaire s'adapte à l'utilisatrice.",
-    attendu: { type: "Incident", categorie: "Matériel", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Matériel", "Poste de travail"],
+      urgence: "Haute",
+      impact: ["Basse", "Moyenne"]
+    }
   },
   {
     id: "t04-imprimante",
@@ -75,7 +90,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Relancez-le encore une fois. Les imprimantes réseau mettent parfois du temps à recevoir les documents, il faut un peu insister avant que ça parte." }
     ],
     pointCle: "savoir d'abord si c'est le poste ou l'imprimante, avant toute action lourde.",
-    attendu: { type: "Incident", categorie: "Impression", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Impression",
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t05-onedrive",
@@ -92,7 +112,12 @@ window.TICKETS = [
       { note: 0, texte: "Pour l'instant, je ne vois pas d'autre solution que d'attendre. À l'avenir, copiez vos fichiers importants sur une clé USB en plus, comme ça vous ne dépendrez plus de la synchronisation." }
     ],
     pointCle: "rassurer, puis vérifier l'état de la synchronisation. Le problème vient peut-être du PC de la maison, pas de celui du bureau.",
-    attendu: { type: "Incident", categorie: "Fichiers et partages", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Fichiers et partages", "Messagerie et collaboratif"],
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t06-mail-suspect",
@@ -108,7 +133,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "On fait pourtant des sensibilisations régulières là-dessus. Une banque ne demande jamais vos identifiants par mail, comment avez-vous pu tomber dedans ?" }
     ],
     pointCle: "ici, la bonne réponse est une action immédiate, pas une question. Culpabiliser l'utilisateur, c'est s'assurer qu'il ne signalera plus rien.",
-    attendu: { type: "Incident", categorie: "Sécurité", urgence: "Très haute", impact: "Moyenne" }
+    attendu: {
+      type: "Incident",
+      categorie: "Sécurité",
+      urgence: "Très haute",
+      impact: ["Moyenne", "Haute"]
+    }
   },
   {
     id: "t07-compte-verrouille",
@@ -124,7 +154,12 @@ window.TICKETS = [
       { note: 0, texte: "Le verrouillage est automatique après plusieurs erreurs, c'est une sécurité. Patientez une trentaine de minutes sans rien toucher, il se débloquera tout seul et vous pourrez réessayer." }
     ],
     pointCle: "vérifier l'identité avant toute action sur un compte. C'est la parade contre l'ingénierie sociale.",
-    attendu: { type: "Incident", categorie: "Comptes et accès", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Comptes et accès",
+      urgence: "Haute",
+      impact: "Basse"
+    }
   },
   {
     id: "t08-logiciel",
@@ -140,7 +175,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Une licence, ça va prendre des jours. En attendant, cherchez une version gratuite sur Internet, il y en a plein qui circulent, ça vous dépannera pour votre plaquette." }
     ],
     pointCle: "savoir escalader proprement au lieu de renvoyer l'utilisateur se débrouiller.",
-    attendu: { type: "Demande", categorie: "Logiciel", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Demande",
+      categorie: "Logiciel",
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t09-panne-materielle",
@@ -157,7 +197,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Parfois une pièce est simplement mal enfoncée et fait du bruit. Tapotez doucement sur le côté du boîtier : si le clic s'arrête, c'est que ça s'est remis en place." }
     ],
     pointCle: "un disque qui claque, c'est d'abord des données à sauver. La défragmentation peut l'achever.",
-    attendu: { type: "Incident", categorie: "Matériel", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Matériel",
+      urgence: ["Haute", "Très haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t10-utilisateur-en-colere",
@@ -173,7 +218,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Je comprends votre agacement, mais je ne continuerai pas cet échange si vous me parlez sur ce ton. Revenez me voir quand vous serez plus calme." }
     ],
     pointCle: "accueillir l'émotion, puis traiter la récurrence. Un incident qui revient demande de consulter l'historique, pas d'appliquer une nouvelle rustine.",
-    attendu: { type: "Incident", categorie: "Messagerie et collaboratif", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Messagerie et collaboratif", "Logiciel"],
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t11-rancongiciel",
@@ -189,7 +239,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Surtout, ne payez pas. Supprimez le message et les fichiers bizarres, puis restaurez ce que vous pouvez depuis la corbeille ou depuis votre clé USB." }
     ],
     pointCle: "isoler le poste du réseau pour stopper la propagation, sans l'éteindre (la mémoire sert à l'analyse), puis escalader.",
-    attendu: { type: "Incident", categorie: "Sécurité", urgence: "Très haute", impact: "Haute" }
+    attendu: {
+      type: "Incident",
+      categorie: "Sécurité",
+      urgence: "Très haute",
+      impact: ["Haute", "Très haute"]
+    }
   },
   {
     id: "t12-accessibilite",
@@ -205,7 +260,12 @@ window.TICKETS = [
       { note: 0, texte: "Pour vous, le plus simple serait un écran plus grand. Je fais une demande de matériel, vous devriez le recevoir d'ici quelques semaines." }
     ],
     pointCle: "rétablir ses réglages d'accessibilité plutôt que de proposer un contournement, en expliquant et en demandant son accord.",
-    attendu: { type: "Incident", categorie: "Poste de travail", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Poste de travail",
+      urgence: ["Haute", "Moyenne"],
+      impact: "Basse"
+    }
   },
   {
     id: "t13-vpn",
@@ -221,7 +281,12 @@ window.TICKETS = [
       { note: 0, texte: "Un délai dépassé vient presque toujours du serveur VPN de l'entreprise. Je signale la panne à l'équipe réseau, et je vous rappelle dès que c'est rétabli." }
     ],
     pointCle: "vérifier d'abord la connexion de l'utilisateur avant d'accuser le serveur. Désactiver les protections n'est jamais un réflexe de dépannage.",
-    attendu: { type: "Incident", categorie: "Réseau", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Réseau",
+      urgence: ["Moyenne", "Haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t14-nouvel-arrivant",
@@ -238,7 +303,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "En attendant lundi, il peut utiliser votre session. Donnez-lui votre mot de passe, ce sera plus simple que de tout créer dans l'urgence." }
     ],
     pointCle: "une création de compte suit une procédure validée, avec seulement les droits nécessaires.",
-    attendu: { type: "Demande", categorie: "Comptes et accès", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Demande",
+      categorie: ["Comptes et accès", "Poste de travail"],
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   },
   {
     id: "t15-panne-collective",
@@ -254,7 +324,12 @@ window.TICKETS = [
       { note: 0, texte: "Ce logiciel est géré par l'éditeur, pas par nous. Appelez directement leur support, leur numéro doit être dans le manuel d'utilisation." }
     ],
     pointCle: "quand plusieurs personnes sont touchées, la cause est centrale. L'impact élevé fait monter la priorité.",
-    attendu: { type: "Incident", categorie: "Logiciel", urgence: "Haute", impact: "Haute" }
+    attendu: {
+      type: "Incident",
+      categorie: "Logiciel",
+      urgence: ["Haute", "Très haute"],
+      impact: ["Haute", "Très haute"]
+    }
   },
   {
     id: "t16-cle-usb-trouvee",
@@ -270,7 +345,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Rebranchez-la et ouvrez le fichier, il y aura peut-être le nom du propriétaire dedans. Vous pourrez la lui rendre directement sans passer par nous." }
     ],
     pointCle: "une clé abandonnée est un mode d'attaque classique. On isole, on vérifie le poste, et on remercie l'utilisatrice d'avoir signalé.",
-    attendu: { type: "Incident", categorie: "Sécurité", urgence: "Haute", impact: "Moyenne" }
+    attendu: {
+      type: "Incident",
+      categorie: "Sécurité",
+      urgence: ["Haute", "Très haute"],
+      impact: "Moyenne"
+    }
   },
   {
     id: "t17-micro-teams",
@@ -287,7 +367,12 @@ window.TICKETS = [
       { note: 0, texte: "Ce sont souvent les mises à jour de Windows qui cassent le son. Lancez Windows Update maintenant, puis redémarrez avant votre réunion." }
     ],
     pointCle: "avec cinq minutes devant soi, on vérifie d'abord le périphérique sélectionné, pas une intervention lourde.",
-    attendu: { type: "Incident", categorie: "Messagerie et collaboratif", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Messagerie et collaboratif", "Matériel"],
+      urgence: ["Haute", "Très haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t18-disque-plein",
@@ -303,7 +388,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Allez sur le disque C et supprimez les dossiers que vous ne reconnaissez pas, comme Program Files : ce sont souvent des restes inutiles." }
     ],
     pointCle: "chercher ce qui occupe l'espace avant de supprimer quoi que ce soit. Les données de l'utilisateur ne se suppriment jamais à la légère.",
-    attendu: { type: "Incident", categorie: "Poste de travail", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Poste de travail", "Matériel"],
+      urgence: ["Haute", "Moyenne"],
+      impact: "Basse"
+    }
   },
   {
     id: "t19-ingenierie-sociale",
@@ -319,7 +409,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Pas de problème, vu que c'est vous. Je mets son mot de passe à « Bienvenue2026 », elle pourra se reconnecter immédiatement." }
     ],
     pointCle: "un mot de passe ne se transmet jamais à un tiers, même à un supérieur. L'autorité et l'urgence sont les deux leviers classiques de l'ingénierie sociale. La réponse ~ refuse à juste titre, mais laisse le problème en plan : la secrétaire, bloquée, ne peut pas ouvrir de ticket.",
-    attendu: { type: "Demande", categorie: "Comptes et accès", urgence: "Haute", impact: "Basse" }
+    attendu: {
+      type: ["Demande", "Incident"],
+      categorie: ["Comptes et accès", "Sécurité"],
+      urgence: ["Haute", "Moyenne"],
+      impact: ["Basse", "Moyenne"]
+    }
   },
   {
     id: "t20-double-ecran",
@@ -335,7 +430,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Un double écran, c'est du confort, pas une priorité. Je regarderai quand j'aurai le temps, travaillez sur un seul écran en attendant." }
     ],
     pointCle: "après un déménagement, on vérifie d'abord le physique (câbles, station d'accueil, alimentation) avant de conclure à une panne.",
-    attendu: { type: "Incident", categorie: "Matériel", urgence: "Basse", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Matériel", "Poste de travail"],
+      urgence: ["Basse", "Très basse"],
+      impact: ["Basse", "Très basse"]
+    }
   },
   {
     id: "t21-dossier-supprime",
@@ -351,7 +451,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Ça arrive à tout le monde, mais là je ne peux plus rien faire. L'équipe devra refaire les documents à partir de ses mails et de ses brouillons." }
     ],
     pointCle: "ce qu'on supprime sur un partage réseau ne passe pas par la corbeille. On restaure depuis la sauvegarde.",
-    attendu: { type: "Incident", categorie: "Fichiers et partages", urgence: "Haute", impact: "Moyenne" }
+    attendu: {
+      type: "Incident",
+      categorie: "Fichiers et partages",
+      urgence: ["Haute", "Très haute"],
+      impact: ["Moyenne", "Haute"]
+    }
   },
   {
     id: "t22-fichier-verrouille",
@@ -368,7 +473,12 @@ window.TICKETS = [
       { note: 0, texte: "Copiez le fichier sur votre bureau, travaillez sur la copie, puis remettez-la sur le partage en remplaçant l'original quand vous aurez fini." }
     ],
     pointCle: "identifier qui tient le fichier avant d'agir. Redémarrer un serveur pour un seul fichier bloque tout le monde.",
-    attendu: { type: "Incident", categorie: "Logiciel", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Logiciel", "Fichiers et partages"],
+      urgence: "Moyenne",
+      impact: ["Basse", "Moyenne"]
+    }
   },
   {
     id: "t23-wi-fi-en-salle-de-reunion",
@@ -384,7 +494,12 @@ window.TICKETS = [
       { note: 0, texte: "Oubliez le réseau Wi-Fi dans les paramètres, puis redémarrez votre portable. Ensuite, reconnectez-vous en saisissant à nouveau la clé du réseau." }
     ],
     pointCle: "vérifier les causes simples côté poste avant de mettre en cause l'infrastructure.",
-    attendu: { type: "Incident", categorie: "Réseau", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Réseau",
+      urgence: ["Moyenne", "Haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t24-demande-d-acces",
@@ -400,7 +515,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Demandez à un collègue de la direction de vous prêter ses identifiants le temps du projet, ce sera bien plus simple que toute une procédure." }
     ],
     pointCle: "un droit d'accès se valide par le propriétaire de la ressource, et on ne donne que ce qui est nécessaire.",
-    attendu: { type: "Demande", categorie: "Comptes et accès", urgence: "Basse", impact: "Basse" }
+    attendu: {
+      type: "Demande",
+      categorie: ["Comptes et accès", "Fichiers et partages"],
+      urgence: ["Basse", "Moyenne"],
+      impact: "Basse"
+    }
   },
   {
     id: "t25-mail-au-mauvais-destinataire",
@@ -416,7 +536,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Le mail est parti, on ne peut plus rien y faire. Le mieux est de ne pas en parler, ça évitera d'inquiéter l'équipe pour rien." }
     ],
     pointCle: "une fuite de données personnelles doit être signalée. Le RGPD impose de prévenir la CNIL sous 72 heures dans la plupart des cas.",
-    attendu: { type: "Incident", categorie: "Sécurité", urgence: "Haute", impact: "Moyenne" }
+    attendu: {
+      type: "Incident",
+      categorie: "Sécurité",
+      urgence: ["Haute", "Très haute"],
+      impact: ["Moyenne", "Haute"]
+    }
   },
   {
     id: "t26-boite-mail-pleine",
@@ -432,7 +557,12 @@ window.TICKETS = [
       { note: 0, texte: "Triez vos mails par date et supprimez d'un coup tous ceux de plus d'un an. Vous n'en aurez plus besoin, et votre boîte sera presque vide." }
     ],
     pointCle: "comprendre ce qui remplit la boîte et archiver, plutôt que tout supprimer ou repousser la limite sans règle.",
-    attendu: { type: "Incident", categorie: "Messagerie et collaboratif", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Messagerie et collaboratif",
+      urgence: ["Moyenne", "Haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t27-mise-a-jour-bloquee",
@@ -448,7 +578,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Une heure, c'est qu'elle est plantée. Appuyez longtemps sur le bouton d'alimentation pour l'éteindre, puis rallumez-le : ça repartira normalement." }
     ],
     pointCle: "couper une mise à jour en cours peut rendre le système inutilisable. On vérifie d'abord si elle avance.",
-    attendu: { type: "Incident", categorie: "Poste de travail", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: ["Poste de travail", "Logiciel"],
+      urgence: ["Moyenne", "Haute"],
+      impact: ["Basse", "Moyenne"]
+    }
   },
   {
     id: "t28-videoprojecteur",
@@ -464,7 +599,12 @@ window.TICKETS = [
       { note: 0, texte: "Redémarrez votre portable avec le câble déjà branché. Windows ne détecte pas toujours un écran branché après le démarrage, ça règle souvent tout." }
     ],
     pointCle: "sous pression, on teste dans l'ordre les causes rapides (câble, mode d'affichage, source) avant toute solution lourde.",
-    attendu: { type: "Incident", categorie: "Matériel", urgence: "Très haute", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Matériel",
+      urgence: "Très haute",
+      impact: ["Basse", "Moyenne"]
+    }
   },
   {
     id: "t29-clavier",
@@ -480,7 +620,12 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Un clavier, ça ne coûte rien. Je vous en commande un neuf, et en attendant, tapez avec le clavier virtuel de Windows, il est dans les paramètres." }
     ],
     pointCle: "partir du plus simple, avec des mots que l'utilisatrice comprend. Le « petit boîtier USB » parle plus que « le dongle ».",
-    attendu: { type: "Incident", categorie: "Matériel", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Matériel",
+      urgence: ["Moyenne", "Haute"],
+      impact: "Basse"
+    }
   },
   {
     id: "t30-alerte-de-certificat",
@@ -497,6 +642,11 @@ window.TICKETS = [
       { note: 0, grossiere: true, texte: "Ces messages sont presque toujours de fausses alertes. Changez de navigateur, essayez Firefox par exemple, il bloque beaucoup moins." }
     ],
     pointCle: "une alerte de certificat peut signaler un faux site. On s'arrête, on vérifie l'origine du lien, on ne contourne pas.",
-    attendu: { type: "Incident", categorie: "Sécurité", urgence: "Moyenne", impact: "Basse" }
+    attendu: {
+      type: "Incident",
+      categorie: "Sécurité",
+      urgence: "Moyenne",
+      impact: "Basse"
+    }
   }
 ];

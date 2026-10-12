@@ -85,6 +85,23 @@
 
   /* ======================= Chargement des tickets ======================= */
 
+  // Dans attendu, chaque champ est soit une valeur ("Haute"), soit un tableau
+  // de valeurs acceptées (["Haute", "Très haute"]). On ramène tout à un tableau.
+  function valeursAcceptees(v) {
+    return Array.isArray(v) ? v : [v];
+  }
+
+  // Vérifie qu'un champ de attendu existe et n'utilise que des valeurs connues.
+  function verifierAttendu(p, champ, valeur, possibles) {
+    if (valeur == null || valeursAcceptees(valeur).length === 0) {
+      p.push("attendu." + champ + " manquant");
+      return;
+    }
+    valeursAcceptees(valeur).forEach(function (v) {
+      if (possibles.indexOf(v) === -1) p.push("attendu." + champ + " : « " + v + " » n'est pas une valeur possible");
+    });
+  }
+
   // Vérifie un ticket ; renvoie la liste des problèmes (vide si tout va bien).
   function problemesTicket(t) {
     var p = [];
@@ -102,6 +119,17 @@
         if (!r || [0, 1, 2].indexOf(r.note) === -1) p.push("réponse " + (i + 1) + " : note doit valoir 0, 1 ou 2");
       });
       if (!t.reponses.some(function (r) { return r && r.note === 2; })) p.push("aucune bonne réponse (note: 2)");
+    }
+    // attendu sert à noter le ticket : type et catégorie doivent exister dans
+    // les listes (catégories de config.js), urgence et impact dans NIVEAUX.
+    var a = t.attendu;
+    if (!a || typeof a !== "object") {
+      p.push("attendu manquant");
+    } else {
+      verifierAttendu(p, "type", a.type, TYPES);
+      verifierAttendu(p, "categorie", a.categorie, CATEGORIES);
+      verifierAttendu(p, "urgence", a.urgence, NIVEAUX);
+      verifierAttendu(p, "impact", a.impact, NIVEAUX);
     }
     return p;
   }
