@@ -253,26 +253,28 @@
     afficherTicket();
   }
 
+  // Les 5 champs notés démarrent sur « — Choisir — » (valeur vide) : un apprenant
+  // qui ne touche à rien ne gagne aucun point. Un champ vide vaut 0 au critère.
+  var CHOISIR = { value: "", label: "— Choisir —" };
+
   function preparerFormulaireFixe() {
-    remplirSelect($("t-type"), TYPES);
-    remplirSelect($("t-source"), SOURCES);
-    remplirSelect($("t-categorie"), [{ value: "", label: "— Choisir —" }].concat(CATEGORIES));
+    remplirSelect($("t-type"), [CHOISIR].concat(TYPES));
+    remplirSelect($("t-source"), [CHOISIR].concat(SOURCES));
+    remplirSelect($("t-categorie"), [CHOISIR].concat(CATEGORIES));
     remplirSelect($("t-statut"), STATUTS);
     var niveaux = NIVEAUX.map(function (n, i) { return { value: i + 1, label: n }; });
-    remplirSelect($("t-urgence"), niveaux);
-    remplirSelect($("t-impact"), niveaux);
+    remplirSelect($("t-urgence"), [CHOISIR].concat(niveaux));
+    remplirSelect($("t-impact"), [CHOISIR].concat(niveaux));
     remplirSelect($("t-attribue"), [etat.apprenant + " (moi)"].concat(GROUPES));
   }
 
   function reinitialiserTicket(s) {
     var t = s.ticket;
     $("form-ticket").reset();
-    $("t-type").value = "Incident";
-    $("t-source").value = "Téléphone";
-    $("t-categorie").value = "";
+    ["t-type", "t-source", "t-categorie", "t-urgence", "t-impact"].forEach(function (id) {
+      $(id).value = "";
+    });
     $("t-statut").value = "Nouveau";
-    $("t-urgence").value = 3;
-    $("t-impact").value = 3;
     $("t-demandeur").value = t.nom + (t.service ? " (" + t.service + ")" : "");
     $("t-attribue").selectedIndex = 0;
     $("ticket-id").textContent = s.numero;
@@ -280,10 +282,21 @@
     majPriorite();
   }
 
+  // Priorité calculée par la matrice ; « — » tant que l'urgence ou l'impact manque.
+  function calculerPriorite(urgence, impact) {
+    if (!urgence || !impact) return "";
+    return NIVEAUX[MATRICE[urgence][impact] - 1];
+  }
+
   function majPriorite() {
-    var p = MATRICE[$("t-urgence").value][$("t-impact").value];
-    $("t-priorite").textContent = NIVEAUX[p - 1];
-    $("t-priorite").setAttribute("data-niveau", p);
+    var urg = $("t-urgence").value, imp = $("t-impact").value;
+    if (!urg || !imp) {
+      $("t-priorite").textContent = "—";
+      $("t-priorite").removeAttribute("data-niveau");
+      return;
+    }
+    $("t-priorite").textContent = calculerPriorite(urg, imp);
+    $("t-priorite").setAttribute("data-niveau", MATRICE[urg][imp]);
   }
   $("t-urgence").addEventListener("change", majPriorite);
   $("t-impact").addEventListener("change", majPriorite);
@@ -440,17 +453,18 @@
     if ($("btn-enregistrer").disabled) return;
 
     var s = etat.session[etat.index];
-    var urg = Number($("t-urgence").value), imp = Number($("t-impact").value);
+    // Un champ laissé sur « — Choisir — » est enregistré vide ("").
+    var urg = $("t-urgence").value, imp = $("t-impact").value;
     s.saisie = {
       titre: $("t-titre").value.trim(),
       description: $("t-description").value.trim(),
       type: $("t-type").value,
       source: $("t-source").value,
-      categorie: $("t-categorie").value || "(non renseignée)",
+      categorie: $("t-categorie").value,
       statut: $("t-statut").value,
-      urgence: NIVEAUX[urg - 1],
-      impact: NIVEAUX[imp - 1],
-      priorite: NIVEAUX[MATRICE[urg][imp] - 1],
+      urgence: urg ? NIVEAUX[urg - 1] : "",
+      impact: imp ? NIVEAUX[imp - 1] : "",
+      priorite: calculerPriorite(urg, imp),
       demandeur: $("t-demandeur").value.trim(),
       attribue: $("t-attribue").value
     };
@@ -471,6 +485,9 @@
   }
 
   function etoiles(note) { return "★".repeat(note) + "☆".repeat(2 - note); }
+
+  // Valeur d'un champ du ticket telle qu'affichée dans le rapport.
+  function afficheChamp(v) { return v ? v : "(non renseigné)"; }
 
   // Construit le contenu du rapport (utilisé à l'écran, à l'impression et dans le fichier téléchargé).
   function contenuRapport() {
@@ -504,8 +521,10 @@
 
       html += '<div class="r-glpi"><h4>Ticket saisi ' + esc(s.numero) + "</h4>" +
         "<p><strong>" + esc(g.titre) + "</strong></p>" +
-        "<p>" + [g.type, g.categorie, "Urgence " + g.urgence.toLowerCase(), "Impact " + g.impact.toLowerCase(),
-          "Priorité " + g.priorite.toLowerCase(), g.statut, "Source : " + g.source, "Attribué à : " + g.attribue].map(esc).join(" · ") + "</p>" +
+        "<p>" + ["Type : " + afficheChamp(g.type), "Catégorie : " + afficheChamp(g.categorie),
+          "Urgence : " + afficheChamp(g.urgence), "Impact : " + afficheChamp(g.impact),
+          "Priorité : " + afficheChamp(g.priorite), g.statut, "Source : " + afficheChamp(g.source),
+          "Attribué à : " + g.attribue].map(esc).join(" · ") + "</p>" +
         "<p>" + (g.description ? esc(g.description) : "<em>(pas de description)</em>") + "</p>";
       if (a.type) {
         html += '<p class="r-attendu"><strong>Repère attendu :</strong> ' +
