@@ -620,10 +620,11 @@
     ".r-attendu{color:#6B6358;font-size:.9rem}" +
     ".r-notes{display:flex;gap:10px;flex-wrap:wrap}.r-formateur{font-size:.8rem;font-style:italic;color:#6B6358}" +
     ".r-criteres{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:.88rem}" +
-    ".r-criteres th,.r-criteres td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid #E6DECF;overflow-wrap:anywhere}" +
+    ".r-criteres th,.r-criteres td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid #E6DECF;overflow-wrap:break-word}" +
     ".r-criteres thead th{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:#6B6358}.r-criteres tbody th{font-weight:800}" +
     ".r-criteres .r-verdict{width:1%;text-align:center;font-weight:800;white-space:nowrap}" +
     ".r-ok{background:#E6F0E6}.r-ko{background:#F7E6E1}.r-ok .r-verdict{color:#4F7D52}.r-ko .r-verdict{color:#B4553C}" +
+    "@media (max-width:600px){.page{padding:18px}.r-criteres{font-size:.8rem}.r-criteres th,.r-criteres td{padding:4px 5px}}" +
     "@media print{body{background:#fff;padding:0}.page{box-shadow:none;padding:0}}";
 
   function nomFichier() {
