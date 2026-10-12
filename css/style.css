@@ -242,6 +242,10 @@ textarea { resize: vertical; min-height: 90px; }
 .r-ok .r-verdict { color: var(--ok); }
 .r-ko .r-verdict { color: var(--ko); }
 
+/* ---------- Pied de page (mentions de licence) ---------- */
+.pied { position: relative; z-index: 1; text-align: center; font-size: .75rem; color: var(--discret); padding: 0 16px 24px; }
+.pied span { display: inline-block; } /* sur téléphone, la ligne se coupe entre les deux mentions */
+
 /* ---------- Animations ---------- */
 @keyframes apparition { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes point { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
@@ -268,7 +272,7 @@ textarea { resize: vertical; min-height: 90px; }
 @media print {
   :root { --surface: #fff; --texte: #000; }
   body { background: #fff; }
-  .decor, .barre, .rapport-actions { display: none !important; }
+  .decor, .barre, .rapport-actions, .pied { display: none !important; }
   main { margin: 0; padding: 0; max-width: none; }
   .rapport { box-shadow: none; padding: 0; }
   .r-ticket { break-inside: avoid; }
