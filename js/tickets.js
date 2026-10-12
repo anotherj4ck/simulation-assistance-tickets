@@ -4,11 +4,21 @@
  * Pour ajouter un ticket : copiez un bloc { ... } complet, collez-le à la fin
  * (avant le ]; final), ajoutez une virgule entre les deux blocs, puis modifiez le texte.
  *
+ * - source : "Téléphone", "Courriel", "Direct", "Helpdesk" ou "Autre"
+ *     (le texte de la demande et des réponses doit coller à ce canal)
+ * - objet : obligatoire si source vaut "Courriel" (objet du message)
+ * - canal : pour la source "Autre", titre affiché (ex. "Message Teams")
  * - note : 2 = bonne réponse, 1 = en partie vraie, 0 = fausse
  * - grossiere: true  -> réponse signalée en rouge dans le rapport
  * - la bonne réponse peut rester en premier : l'outil mélange l'ordre à chaque affichage
- * - attendu.categorie doit faire partie de la liste CATEGORIES de config.js
+ *
+ * attendu : la qualification juste, qui sert à noter le ticket.
+ * - type : "Incident" ou "Demande"
+ * - categorie : une valeur de la liste categories de config.js
  * - urgence / impact : "Très basse", "Basse", "Moyenne", "Haute", "Très haute"
+ * - une chaîne = une seule valeur acceptée ; un tableau = plusieurs valeurs
+ *   acceptées, quand la qualification se discute. Ex. : urgence: ["Haute", "Très haute"]
+ * - la source n'est pas dans attendu : c'est le champ source ci-dessus qui fait foi.
  */
 window.TICKETS = [
   {
