@@ -94,3 +94,12 @@ Dans `js/tickets.js`, copier un bloc `{ ... }` complet, le coller à la fin de l
 - Les quatre réponses doivent avoir des longueurs proches : la bonne ne doit pas se reconnaître à sa taille.
 
 Un ticket mal rempli (source inconnue, catégorie absente de `config.js`, niveau d'urgence mal écrit…) est ignoré et signalé dans la console du navigateur (F12), sans bloquer les autres.
+
+## Licence
+
+Le dépôt a deux licences :
+
+- **Le code** (`index.html`, `css/`, `js/app.js`, `js/config.js`) est sous licence MIT : voir [LICENSE](LICENSE).
+- **Les scénarios** de `js/tickets.js` (demandes, réponses, points clés, qualifications attendues) sont © 2026 anotherj4ck, tous droits réservés : voir [LICENCE-CONTENU.md](LICENCE-CONTENU.md).
+
+Pour réutiliser les scénarios (copie, adaptation, formation dans un autre organisme, publication), ouvrez une « issue » sur ce dépôt : l'autorisation est accordée gratuitement, au cas par cas.

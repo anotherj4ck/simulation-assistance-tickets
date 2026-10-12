@@ -1,4 +1,7 @@
 /*
+ * Contenu des scénarios © 2026 anotherj4ck, tous droits réservés (la licence MIT ne s'applique pas ici).
+ * Toute réutilisation demande une autorisation : voir LICENCE-CONTENU.md.
+ *
  * Réserve de tickets de la simulation.
  *
  * Pour ajouter un ticket : copiez un bloc { ... } complet, collez-le à la fin
