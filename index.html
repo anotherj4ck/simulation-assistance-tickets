@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulation d'assistance informatique</title>
+  <meta name="description" content="Simulation d'appels au support informatique : répondre à l'utilisateur et créer le ticket.">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Applique le thème mémorisé avant l'affichage, pour éviter un flash de couleur -->
+  <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+  <div class="decor" aria-hidden="true">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  </div>
+
+  <header class="barre verre">
+    <div>
+      <div class="nom-outil" data-config="nomOutil"></div>
+      <div class="info" id="info-apprenant"></div>
+    </div>
+    <div class="barre-droite">
+      <div class="progression" id="progression" hidden>
+        <span>Ticket <span id="prog-num">1</span> / <span id="prog-total">5</span></span>
+        <div class="jauge" aria-hidden="true"><span id="jauge"></span></div>
+      </div>
+      <button class="btn-rond" id="btn-theme" type="button" aria-label="Passer en thème sombre">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Accueil : saisie du nom -->
+    <section class="ecran carte verre" id="ecran-accueil">
+      <h1 data-config="nomOutil"></h1>
+      <p class="sous-titre" data-config="sousTitre"></p>
+      <form id="form-nom" class="form-nom" novalidate>
+        <label for="nom">Votre nom ou prénom</label>
+        <div class="ligne">
+          <input id="nom" name="nom" type="text" maxlength="40" autocomplete="off" required>
+          <button class="btn principal" type="submit">OK</button>
+        </div>
+        <p class="aide" id="aide-nom" role="alert"></p>
+      </form>
+      <p class="erreur" id="erreur-chargement" role="alert" hidden></p>
+    </section>
+
+    <!-- 2. Consigne -->
+    <section class="ecran carte verre" id="ecran-consigne" hidden>
+      <h2>Avant de commencer</h2>
+      <ol class="consigne">
+        <li>Vous êtes technicien au centre de services. Des utilisateurs vous appellent.</li>
+        <li>Pour chaque appel, choisissez la réponse que vous donneriez à l'utilisateur.</li>
+        <li>En parallèle, créez le ticket dans l'outil de ticketing, puis enregistrez-le pour passer à l'appel suivant.</li>
+        <li>À la fin, un rapport s'affiche : téléchargez-le ou imprimez-le pour votre formateur.</li>
+      </ol>
+      <p class="sous-titre"><span id="nb-tickets">5</span> appels · chaque bonne réponse rapporte 2 étoiles, une réponse en partie juste 1 étoile.</p>
+      <button class="btn principal" id="btn-commencer" type="button">Commencer</button>
+    </section>
+
+    <!-- 3. Simulation : chat à gauche, ticket à droite -->
+    <section class="ecran grille" id="ecran-simulation" hidden>
+      <section class="panneau verre" aria-labelledby="titre-chat">
+        <div class="panneau-titre">
+          <h2 id="titre-chat">Appel entrant</h2>
+          <span class="pastille">Téléphone</span>
+        </div>
+        <div class="chat" id="chat" aria-live="polite"></div>
+        <div class="choix-titre" id="choix-titre">Votre réponse</div>
+        <div class="choix" id="choix" role="group" aria-labelledby="choix-titre"></div>
+      </section>
+
+      <section class="panneau verre" aria-labelledby="titre-ticket">
+        <div class="panneau-titre">
+          <h2 id="titre-ticket">Nouveau ticket</h2>
+          <span class="ticket-id" id="ticket-id"></span>
+        </div>
+        <form class="ticket" id="form-ticket" novalidate>
+          <div class="ticket-meta"><span data-config="nomTicketing"></span> · Ouvert le <span id="ticket-date"></span></div>
+
+          <label class="plein">Titre
+            <input id="t-titre" type="text" maxlength="120" placeholder="Ex. : Perte de connexion réseau sur un poste">
+          </label>
+          <label class="plein">Description
+            <textarea id="t-description" rows="4" placeholder="Décrivez le problème et ce qui a été fait…"></textarea>
+          </label>
+
+          <div class="champs">
+            <label>Type <select id="t-type"></select></label>
+            <label>Source de la demande <select id="t-source"></select></label>
+            <label>Catégorie <select id="t-categorie"></select></label>
+            <label>Statut <select id="t-statut"></select></label>
+            <label>Urgence <select id="t-urgence"></select></label>
+            <label>Impact <select id="t-impact"></select></label>
+            <div class="champ-calcule">
+              <span class="etiquette">Priorité</span>
+              <output id="t-priorite" class="priorite" aria-live="polite"></output>
+            </div>
+            <label>Demandeur <input id="t-demandeur" type="text" maxlength="80"></label>
+            <label class="plein">Attribué à <select id="t-attribue"></select></label>
+          </div>
+
+          <div class="actions">
+            <p class="aide" id="aide-enregistrer" aria-live="polite"></p>
+            <button class="btn principal" id="btn-enregistrer" type="submit" disabled>Enregistrer le ticket</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <!-- 4. Rapport -->
+    <section class="ecran" id="ecran-rapport" hidden>
+      <div class="carte verre rapport-actions">
+        <div>
+          <h2>Session terminée</h2>
+          <p class="sous-titre">Téléchargez le rapport pour le transmettre à votre formateur.</p>
+        </div>
+        <div class="boutons">
+          <button class="btn principal" id="btn-telecharger" type="button">Télécharger le rapport</button>
+          <button class="btn secondaire" id="btn-imprimer" type="button">Imprimer</button>
+          <button class="btn secondaire" id="btn-recommencer" type="button">Nouvelle session</button>
+        </div>
+      </div>
+      <div class="carte rapport" id="rapport-contenu"></div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/tickets.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
