@@ -228,6 +228,19 @@ textarea { resize: vertical; min-height: 90px; }
 .r-glpi h4 { margin: 0 0 6px; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; color: var(--discret); }
 .r-glpi p { margin: 4px 0; }
 .r-attendu { color: var(--discret); font-size: .9rem; }
+.r-notes { display: flex; gap: 10px; flex-wrap: wrap; }
+.r-formateur { font-size: .8rem; font-style: italic; color: var(--discret); }
+
+/* Tableau des 5 critères notés du ticket : ✓ ou ✗ restent lisibles même sans couleur (impression) */
+.r-criteres { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: .88rem; }
+.r-criteres th, .r-criteres td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--champ-bord); overflow-wrap: anywhere; }
+.r-criteres thead th { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: var(--discret); }
+.r-criteres tbody th { font-weight: 800; }
+.r-criteres .r-verdict { width: 1%; text-align: center; font-weight: 800; white-space: nowrap; }
+.r-ok { background: var(--ok-fond); }
+.r-ko { background: var(--ko-fond); }
+.r-ok .r-verdict { color: var(--ok); }
+.r-ko .r-verdict { color: var(--ko); }
 
 /* ---------- Animations ---------- */
 @keyframes apparition { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

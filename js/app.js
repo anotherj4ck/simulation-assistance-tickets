@@ -480,6 +480,7 @@
 
   /* ======================= Rapport ======================= */
 
+  // Note des réponses : somme des étoiles (2 par ticket au maximum).
   function score() {
     return etat.session.reduce(function (total, s) { return total + s.ticket.reponses[s.choix].note; }, 0);
   }
@@ -488,6 +489,50 @@
 
   // Valeur d'un champ du ticket telle qu'affichée dans le rapport.
   function afficheChamp(v) { return v ? v : "(non renseigné)"; }
+
+  /* ---------- Note du ticket ---------- */
+
+  // Les 5 critères notés d'un ticket saisi. Pour chacun : la valeur saisie,
+  // les valeurs acceptées, et ok = true si la saisie en fait partie.
+  // La source est un fait du scénario : une seule valeur acceptée, celle du ticket.
+  // Un champ laissé vide n'est jamais juste.
+  function criteresTicket(s) {
+    var t = s.ticket, g = s.saisie, a = t.attendu;
+    var criteres = [
+      { nom: "Type", saisi: g.type, acceptes: valeursAcceptees(a.type) },
+      { nom: "Source", saisi: g.source, acceptes: [t.source] },
+      { nom: "Catégorie", saisi: g.categorie, acceptes: valeursAcceptees(a.categorie) },
+      { nom: "Urgence", saisi: g.urgence, acceptes: valeursAcceptees(a.urgence) },
+      { nom: "Impact", saisi: g.impact, acceptes: valeursAcceptees(a.impact) }
+    ];
+    criteres.forEach(function (c) {
+      c.ok = c.saisi !== "" && c.acceptes.indexOf(c.saisi) !== -1;
+    });
+    return criteres;
+  }
+
+  // Nombre de critères justes sur un ticket (de 0 à 5).
+  function criteresJustes(s) {
+    return criteresTicket(s).filter(function (c) { return c.ok; }).length;
+  }
+
+  // Note d'un ticket sur 2 : (critères justes / 5) × 2, soit 0,4 point par critère.
+  function noteTicket(s) {
+    return criteresJustes(s) / 5 * 2;
+  }
+
+  // Note des tickets de la session (sur 10 pour 5 tickets). On additionne
+  // d'abord les critères justes (nombres entiers) pour éviter les erreurs
+  // d'arrondi des nombres à virgule.
+  function scoreTickets() {
+    var justes = etat.session.reduce(function (total, s) { return total + criteresJustes(s); }, 0);
+    return justes / 5 * 2;
+  }
+
+  // Écrit une note à la française avec une décimale : 8.4 -> « 8,4 ».
+  function noteFr(n) {
+    return n.toFixed(1).replace(".", ",");
+  }
 
   // Construit le contenu du rapport (utilisé à l'écran, à l'impression et dans le fichier téléchargé).
   function contenuRapport() {
@@ -498,13 +543,19 @@
       "<p><strong>Apprenant :</strong> " + esc(etat.apprenant) + "</p>" +
       "<p><strong>Date :</strong> " + esc(etat.debut.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })) +
       " · <strong>Durée :</strong> " + duree + " min</p>" +
-      '<p class="r-legende">★★ bonne réponse · ★☆ en partie juste · ☆☆ fausse. Les tickets saisis ne sont pas notés : ils sont à commenter par le formateur.</p>' +
+      '<p class="r-legende">Réponses : ★★ bonne réponse · ★☆ en partie juste · ☆☆ fausse.<br>' +
+      "Ticket : 5 critères (type, source, catégorie, urgence, impact), 0,4 point par critère juste ; " +
+      "un champ non renseigné vaut 0. Titre, description, statut et attribution sont à évaluer par le formateur.</p>" +
       "</div>" +
-      '<div class="r-note">Note<strong>' + score() + " / " + max + "</strong></div></div>";
+      // Deux notes séparées : l'une ne compense pas l'autre.
+      '<div class="r-notes">' +
+      '<div class="r-note">Réponses<strong>' + score() + " / " + max + "</strong></div>" +
+      '<div class="r-note">Ticket<strong>' + noteFr(scoreTickets()) + " / " + max + "</strong></div>" +
+      "</div></div>";
 
     etat.session.forEach(function (s, i) {
       var t = s.ticket, rep = t.reponses[s.choix], bonne = t.reponses.filter(function (r) { return r.note === 2; })[0];
-      var g = s.saisie, a = t.attendu || {};
+      var g = s.saisie;
       var icone = rep.note === 2 ? "✓" : rep.note === 1 ? "~" : "✗";
 
       html += '<article class="r-ticket">' +
@@ -519,18 +570,24 @@
       }
       if (t.pointCle) html += '<p class="r-cle"><strong>Point clé :</strong> ' + esc(t.pointCle) + "</p>";
 
-      html += '<div class="r-glpi"><h4>Ticket saisi ' + esc(s.numero) + "</h4>" +
+      // Ticket saisi : titre et description tels quels (non notés), puis le
+      // tableau des 5 critères notés, puis les champs laissés au formateur.
+      html += '<div class="r-glpi"><h4>Ticket saisi ' + esc(s.numero) + " — " + noteFr(noteTicket(s)) + " / 2</h4>" +
+        '<p class="r-formateur">Titre et description : à évaluer par le formateur</p>' +
         "<p><strong>" + esc(g.titre) + "</strong></p>" +
-        "<p>" + ["Type : " + afficheChamp(g.type), "Catégorie : " + afficheChamp(g.categorie),
-          "Urgence : " + afficheChamp(g.urgence), "Impact : " + afficheChamp(g.impact),
-          "Priorité : " + afficheChamp(g.priorite), g.statut, "Source : " + afficheChamp(g.source),
-          "Attribué à : " + g.attribue].map(esc).join(" · ") + "</p>" +
-        "<p>" + (g.description ? esc(g.description) : "<em>(pas de description)</em>") + "</p>";
-      if (a.type) {
-        html += '<p class="r-attendu"><strong>Repère attendu :</strong> ' +
-          esc([a.type, a.categorie, "Urgence " + String(a.urgence).toLowerCase(), "Impact " + String(a.impact).toLowerCase()].join(" · ")) + "</p>";
-      }
-      html += "</div></article>";
+        "<p>" + (g.description ? esc(g.description) : "<em>(pas de description)</em>") + "</p>" +
+        '<table class="r-criteres"><thead><tr><th scope="col">Critère</th><th scope="col">Saisi</th>' +
+        '<th scope="col">Attendu</th><th scope="col" class="r-verdict">Résultat</th></tr></thead><tbody>';
+      criteresTicket(s).forEach(function (c) {
+        html += '<tr class="' + (c.ok ? "r-ok" : "r-ko") + '"><th scope="row">' + esc(c.nom) + "</th>" +
+          "<td>" + esc(afficheChamp(c.saisi)) + "</td>" +
+          "<td>" + esc(c.acceptes.join(" ou ")) + "</td>" +
+          '<td class="r-verdict">' + (c.ok ? "✓" : "✗") + "</td></tr>";
+      });
+      html += "</tbody></table>" +
+        '<p class="r-attendu">Non noté : priorité ' + esc(afficheChamp(g.priorite).toLowerCase()) +
+        " · statut " + esc(g.statut.toLowerCase()) + " · attribué à " + esc(g.attribue) + "</p>" +
+        "</div></article>";
     });
     return html;
   }
@@ -561,6 +618,12 @@
     ".r-glpi{margin-top:12px;padding:12px 14px;border-radius:12px;border:1.5px solid #E6DECF}" +
     ".r-glpi h4{margin:0 0 6px;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:#6B6358}.r-glpi p{margin:4px 0}" +
     ".r-attendu{color:#6B6358;font-size:.9rem}" +
+    ".r-notes{display:flex;gap:10px;flex-wrap:wrap}.r-formateur{font-size:.8rem;font-style:italic;color:#6B6358}" +
+    ".r-criteres{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:.88rem}" +
+    ".r-criteres th,.r-criteres td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid #E6DECF;overflow-wrap:anywhere}" +
+    ".r-criteres thead th{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:#6B6358}.r-criteres tbody th{font-weight:800}" +
+    ".r-criteres .r-verdict{width:1%;text-align:center;font-weight:800;white-space:nowrap}" +
+    ".r-ok{background:#E6F0E6}.r-ko{background:#F7E6E1}.r-ok .r-verdict{color:#4F7D52}.r-ko .r-verdict{color:#B4553C}" +
     "@media print{body{background:#fff;padding:0}.page{box-shadow:none;padding:0}}";
 
   function nomFichier() {
