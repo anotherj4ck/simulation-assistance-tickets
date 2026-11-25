@@ -1,0 +1,44 @@
+{
+  "_lisezmoi": "Listes tirées au sort par le serveur pour imposer la variété des utilisateurs (voir serveur/README.md). Chaque liste doit rester non vide. Les services sont écrits en minuscules, sans accord de genre.",
+  "prenoms_femmes": [
+    "Inès", "Camille", "Sophie", "Nadia", "Fatou", "Chloé", "Mélanie", "Aurélie",
+    "Yasmine", "Claire", "Mai", "Sandrine", "Léa", "Amina", "Julie", "Nathalie",
+    "Elena", "Lucie", "Samira", "Valérie", "Océane", "Agnès", "Ana", "Coralie"
+  ],
+  "prenoms_hommes": [
+    "Karim", "Lucas", "Thomas", "Mehdi", "Julien", "Antoine", "Moussa", "Hugo",
+    "Sébastien", "Rachid", "Nicolas", "Vincent", "Kevin", "Mathieu", "Yann", "Bruno",
+    "Diego", "Olivier", "Samuel", "Patrick", "Ibrahim", "Théo", "Laurent", "Minh"
+  ],
+  "noms_de_famille": [
+    "Bernard", "Dubois", "Robin", "Benali", "N'Diaye", "Morin", "Fontaine", "Garnier",
+    "Nguyen", "Da Silva", "Haddad", "Leroy", "Mercier", "Traoré", "Lambert", "Moreau",
+    "Kowalski", "Martinez", "Rousseau", "Chevalier", "Diallo", "Perrin", "Brunet", "Hamidi",
+    "Lemaire", "Ferreira", "Colin", "Masson", "Bouvier", "Schmitt"
+  ],
+  "services": [
+    "accueil", "comptabilité", "RH", "paie", "achats", "logistique", "entrepôt",
+    "atelier", "bureau d'études", "commercial", "marketing", "communication",
+    "juridique", "secrétariat", "direction", "service client", "qualité", "formation",
+    "facturation", "contrôle de gestion", "services techniques", "standard téléphonique"
+  ],
+  "tons": [
+    "calme et poli",
+    "pressé, il a une échéance proche",
+    "inquiet, il a peur d'avoir fait une bêtise",
+    "agacé, ce n'est pas la première fois que ça arrive",
+    "perdu, il ne sait pas trop comment expliquer",
+    "bavard, il glisse un détail qui ne sert à rien",
+    "sur la défensive, il assure qu'il n'a rien touché",
+    "aimable mais très vague",
+    "stressé, son responsable attend après lui",
+    "sec et pressant, il veut une solution immédiate"
+  ],
+  "aisances": [
+    "très peu à l'aise avec l'informatique : il décrit ce qu'il voit avec des mots approximatifs",
+    "peu à l'aise : il connaît les gestes de base mais ne comprend pas ce qui se passe",
+    "à l'aise au quotidien : il décrit clairement le problème, sans vocabulaire technique",
+    "assez à l'aise : il a déjà essayé quelque chose par lui-même avant d'appeler (redémarrer, chercher sur internet)",
+    "se croit plus compétent qu'il ne l'est : il avance une explication fausse avec assurance"
+  ]
+}
