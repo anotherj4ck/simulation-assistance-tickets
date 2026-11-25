@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -290,6 +291,24 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
 @app.get("/index.html", include_in_schema=False)
 async def accueil() -> FileResponse:
     return FileResponse(RACINE_SITE / "index.html")
+
+
+# --- Mode formateur : 3 fichiers de serveur/formateur/, servis un par un ------
+# Pas de montage de dossier : rien d'autre que ces trois fichiers n'est exposé.
+# Le site publié (GitHub Pages) ne lie pas cette page et n'en dépend pas.
+
+DOSSIER_FORMATEUR = Path(__file__).resolve().parent / "formateur"
+FICHIERS_FORMATEUR = ("formateur.html", "formateur.js", "formateur.css")
+
+
+def _route_formateur(nom: str):
+    async def servir() -> FileResponse:
+        return FileResponse(DOSSIER_FORMATEUR / nom)
+    return servir
+
+
+for _nom in FICHIERS_FORMATEUR:
+    app.add_api_route(f"/{_nom}", _route_formateur(_nom), methods=["GET"], include_in_schema=False)
 
 
 for _dossier in DOSSIERS_DU_SITE:

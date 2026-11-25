@@ -51,6 +51,26 @@ Ouvrez ensuite <http://127.0.0.1:8000/>. Arrêt : `Ctrl+C`.
 
 Gardez `--host 127.0.0.1` : le serveur n'est alors accessible que depuis votre propre poste. Ne le remplacez pas par `0.0.0.0`.
 
+## Mode formateur (local)
+
+Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette page sert à générer des tickets, les relire, les corriger et les exporter.
+
+- **En-tête** : au chargement, la page interroge `/api/sante` et affiche le modèle utilisé (pastille verte). Si Ollama ou le modèle ne répond pas, un bandeau rouge explique quoi faire, avec un bouton « Revérifier ».
+- **Génération** : choisissez la catégorie (liste de `js/config.js`), la difficulté et, si vous le souhaitez, la source (sinon elle est tirée au hasard), puis cliquez sur « Générer ». Un indicateur tourne pendant l'attente (comptez 20 à 60 s) et affiche le temps écoulé.
+- **Alertes** : les passages sensibles des réponses notées ✓ ou ~ apparaissent dans un bandeau orange au-dessus du ticket (voir « Alertes de relecture » plus bas).
+- **Relecture** : tous les textes sont modifiables (thème, nom, service, objet ou canal, demande, réponses, point clé). On peut aussi changer :
+  - la note de chaque réponse : ✓ bonne, ~ en partie vraie, ✗ fausse, ✗✗ grossière ;
+  - les valeurs attendues : cocher plusieurs valeurs les rend toutes acceptées.
+
+  Un avertissement apparaît si la bonne réponse devient la plus longue des quatre.
+- **Valider** ajoute le ticket à la liste du bas, s'il est complet : exactement une bonne réponse, aucun texte vide, objet présent pour un courriel, au moins une valeur cochée pour chaque critère. **Rejeter** l'abandonne.
+- **Liste des tickets validés** : elle est gardée dans la mémoire du navigateur (`localStorage`) et survit donc à un rechargement de la page. Elle est propre à ce navigateur, sur ce poste. Chaque ticket peut être retiré ; « Vider la liste » efface tout, après confirmation.
+- **Exporter** télécharge `tickets-valides-AAAA-MM-JJ.json`, un tableau de tickets au format de `js/tickets.js`.
+
+**Ajouter les tickets exportés au site.** Ouvrez le fichier JSON et copiez les blocs `{ ... }` (sans les crochets `[ ]` qui les entourent). Collez-les à la fin de la liste de `js/tickets.js`, avant le `];` final, en séparant chaque bloc du précédent par une virgule. Au démarrage suivant, le serveur relit `js/tickets.js` de façon stricte et signale toute erreur ; le site, lui, ignore un ticket invalide et le signale dans la console (F12).
+
+**La page ne fait pas partie du site.** Ses fichiers sont dans `serveur/formateur/` et le serveur les sert un par un (`/formateur.html`, `/formateur.js`, `/formateur.css`). `index.html` ne la lie pas et le site n'en dépend pas. GitHub Pages publie tout de même l'ensemble du dépôt : ouverte de cette façon, sans serveur local, la page affiche seulement « Serveur local injoignable » et l'explication pour le lancer.
+
 ## Configuration (variables d'environnement)
 
 | Variable | Défaut | Rôle |
@@ -209,10 +229,49 @@ Ces fautes restent la matière des réponses grossières.
 
 Les contrôles garantissent la forme, pas la justesse pédagogique : **relisez chaque ticket généré** (bonne réponse vraiment la meilleure, réponse grossière vraiment inacceptable, qualification juste) avant de l'ajouter à `js/tickets.js`.
 
+## Mesures
+
+Trois versions du générateur ont été comparées sur les 6 mêmes requêtes (Réseau, Sécurité, Impression, Comptes et accès ; sources variées), avec `ministral-3:8b`, `OLLAMA_NUM_CTX=8192`, sur une RTX 4060 Laptop (8 Go), en novembre 2026. Avec 6 générations par version, les chiffres sont indicatifs ; les écarts importants, eux, sont nets.
+
+- **A, sans exemples** : prompt système, profils tirés au sort, contrôles et relances.
+- **B, few-shot** : A + 2 tickets de `js/tickets.js` donnés en exemples à chaque génération.
+- **C, few-shot + corrections** : B + ordre des réponses imposé par le schéma, demande limitée à « 2 phrases courtes au plus », règles métier dans le prompt.
+
+| | A : sans exemples | B : few-shot | C : few-shot + corrections |
+|---|---|---|---|
+| Générations réussies | 6 / 6 | 4 / 6 | **6 / 6** |
+| Tentatives rejetées | 2 / 8 (25 %) | 11 / 15 (73 %) | **1 / 7 (14 %)** |
+| Rejets « bonne réponse la plus longue » | 1 | 7 | 1 |
+| Rejets « demande trop longue » | 1 | 7 | **0** |
+| Longueur moyenne des demandes (cible 60 à 150) | 217 car. | 217 car. | **184 car.** |
+| Réponses de plus de 190 car. | 11 / 24 | 3 / 16 | 8 / 24 |
+| Utilisateur seul classé en impact Basse | 1 / 5 | 4 / 4 | **5 / 5** |
+| Réponses ✗✗ vraiment inacceptables | 1 / 4 | 1 / 2 | **4 / 4** |
+| Réponses ✓ ou ~ qui violent une règle métier | 0 | 3 | 1 |
+| Durée par ticket | 20 à 40 s | 37 à 67 s | **≈ 20 s** |
+
+**Ce qui a marché.** Les exemples seuls ont dégradé les résultats (B) : le modèle imitait le ton des tickets, mais pas leurs longueurs. Ce sont les contraintes structurelles qui ont fait la différence (C) :
+- avec l'ordre imposé par le schéma, la bonne réponse s'écrit en dernier, une fois connue la longueur des trois autres ;
+- une demande exprimée en phrases est mieux respectée qu'une demande exprimée en caractères, que le modèle compte mal ;
+- les règles métier écrites noir sur blanc fournissent la matière des réponses grossières, qui deviennent toutes réellement inacceptables.
+
+La règle d'impact explicite (« une seule personne = Basse, sauf propagation ») a corrigé l'erreur de qualification la plus fréquente.
+
+**Ce qui reste à relire humainement.** Un modèle 8B reste peu fiable sur le fond :
+- notes mal attribuées (une réponse ✗ meilleure que la ~) ;
+- bonne réponse parfois incohérente ;
+- demandes parfois illogiques ;
+- catégorie ou impact discutables sur les cas de sécurité ;
+- ton imposé pas toujours perceptible.
+
+Surtout, une réponse notée ~ proposait encore « un accès temporaire via mon compte admin ». Les règles du prompt réduisent ces fautes sans les éliminer.
+
+**Pourquoi les alertes sont volontairement larges.** Elles ne bloquent rien et servent seulement à orienter la relecture. Une recherche de mots ne comprend pas la négation : « ne donnez jamais votre mot de passe » déclenche la même alerte que « donnez-moi votre mot de passe ». Il fallait donc choisir entre manquer une faute et signaler un passage sans problème. Une faute de sécurité notée ✓ ou ~ enseignerait un mauvais réflexe à l'apprenant, alors qu'une fausse alerte coûte quelques secondes de lecture : la liste préfère signaler trop. Dans la série C, 3 alertes sur 4 étaient sans objet ; la seule utile portait sur le cas « compte admin », trouvé grâce à « mot de passe ». « admin » a été ajouté ensuite pour le trouver directement.
+
 ## Sécurité
 
 - Écoute sur `127.0.0.1` uniquement, et les requêtes dont l'en-tête `Host` n'est pas `127.0.0.1` ou `localhost` sont refusées (protection contre le *DNS rebinding*).
-- Seuls `index.html`, `css/` et `js/` sont servis. `serveur/`, `.git/`, `.venv/`, le README et les fichiers de configuration ne le sont jamais.
+- Sont servis : `index.html`, `css/`, `js/` et les trois fichiers de la page formateur (`/formateur.html`, `/formateur.js`, `/formateur.css`), un par un, sans exposer le reste de `serveur/`. `serveur/`, `.git/`, `.venv/`, le README et les fichiers de configuration ne le sont jamais.
 - Aucun secret : Ollama local n'a pas besoin de clé.
 
 ## Tests
@@ -221,6 +280,8 @@ Les contrôles garantissent la forme, pas la justesse pédagogique : **relisez c
 python -m pip install -r serveur\requirements-dev.txt
 python -m pytest serveur\tests
 ```
+
+Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes) et les fichiers servis.
 
 ## Fichiers
 
@@ -232,6 +293,7 @@ serveur/
   exemples.py                  Lecture stricte de js/tickets.js, choix et mise en forme des exemples
   donnees/profils.json         Listes tirées au sort : prénoms, noms, services, tons, aisances
   donnees/alertes.json         Mots sensibles qui déclenchent une alerte de relecture
+  formateur/                   Page formateur (HTML, JS, CSS) : servie par le serveur local uniquement
   prompts/generateur_ticket.md Prompt système du générateur
   requirements.txt             Dépendances (versions épinglées)
   requirements-dev.txt         Dépendances de test (pytest)

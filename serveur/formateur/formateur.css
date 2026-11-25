@@ -1,0 +1,124 @@
+/* =========================================================
+   Mode formateur : compléments à css/style.css (le site n'est pas modifié).
+   Mêmes principes : couleurs en variables, thèmes clair et sombre.
+   ========================================================= */
+
+:root {
+  --alerte: #8A4B00;
+  --alerte-fond: #FFF0D9;
+  --alerte-bord: #F0A63A;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --alerte: #F6BE6E;
+    --alerte-fond: rgba(240, 166, 58, 0.16);
+    --alerte-bord: rgba(240, 166, 58, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --alerte: #F6BE6E;
+  --alerte-fond: rgba(240, 166, 58, 0.16);
+  --alerte-bord: rgba(240, 166, 58, 0.6);
+}
+
+main { display: grid; gap: 20px; }
+h1 { font-size: 1.4rem; margin: 0 0 16px; }
+h3.f-titre { font-size: .8rem; margin: 6px 0 0; text-transform: uppercase; letter-spacing: .5px; color: var(--discret); }
+
+/* ---------- État du modèle (en-tête) ---------- */
+.f-modele {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-weight: 800; font-size: .9rem; padding: 6px 14px; border-radius: 99px;
+  background: var(--surface); border: 1.5px solid var(--champ-bord);
+}
+.f-modele::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--discret); }
+.f-modele[data-etat="ok"] { border-color: var(--ok); }
+.f-modele[data-etat="ok"]::before { background: var(--ok); }
+.f-modele[data-etat="ko"] { border-color: var(--ko); color: var(--ko); }
+.f-modele[data-etat="ko"]::before { background: var(--ko); }
+
+.f-panne {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  margin: 0; padding: 14px 18px; border-radius: 16px;
+  background: var(--ko-fond); border: 1.5px solid var(--ko); color: var(--texte);
+}
+.f-panne strong { color: var(--ko); }
+
+/* ---------- Formulaire de génération ---------- */
+.f-form { display: grid; grid-template-columns: 2fr 1.4fr 1.2fr auto; gap: 12px; align-items: end; }
+.f-form label {
+  display: grid; gap: 5px; font-size: .75rem; font-weight: 800; color: var(--discret);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.f-attente { display: flex; align-items: center; gap: 12px; margin-top: 16px; font-weight: 700; }
+.f-attente .chrono { color: var(--discret); font-weight: 400; }
+.f-roue {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid var(--champ-bord); border-top-color: var(--accent);
+  animation: f-tourne 0.9s linear infinite;
+}
+@keyframes f-tourne { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .f-roue { animation: f-tourne 2.5s linear infinite !important; } /* garde un signe de vie, plus lent */
+}
+
+/* ---------- Alertes de relecture : bandeau orange ---------- */
+.f-alertes {
+  padding: 14px 18px; border-radius: 16px; margin-bottom: 16px;
+  background: var(--alerte-fond); border: 2px solid var(--alerte-bord);
+}
+.f-alertes strong { color: var(--alerte); }
+.f-alertes ul { margin: 8px 0 0; padding-left: 1.2em; }
+.f-alertes li { margin: 4px 0; }
+
+/* ---------- Ticket modifiable ---------- */
+.f-infos { font-size: .85rem; color: var(--discret); margin: 0; }
+.f-infos b { color: var(--texte); }
+.f-reponses { display: grid; gap: 10px; }
+.f-reponse { display: grid; gap: 8px; margin: 0; }
+.f-reponse-tete { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.f-reponse-tete select { width: auto; font-weight: 800; }
+.f-compte { font-size: .78rem; color: var(--discret); }
+.f-reponse textarea { min-height: 64px; background: var(--champ); }
+.f-avertissement { margin: 0; font-size: .85rem; font-weight: 700; color: var(--ko); }
+
+.f-attendu { display: grid; gap: 12px; }
+.f-attendu fieldset { border: 1.5px solid var(--champ-bord); border-radius: 12px; padding: 8px 12px 12px; margin: 0; }
+.f-attendu legend {
+  font-size: .75rem; font-weight: 800; color: var(--discret);
+  text-transform: uppercase; letter-spacing: .5px; padding: 0 4px;
+}
+.f-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+/* La règle « .ticket label » du site (petites capitales grasses) ne doit pas
+   s'appliquer aux puces ni aux longs textes, à relire confortablement. */
+.ticket .f-puce { position: relative; display: inline-block; font-size: inherit; font-weight: 400; color: var(--texte); text-transform: none; letter-spacing: 0; }
+.ticket label textarea { font-weight: 400; }
+.f-puce input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.f-puce span {
+  display: inline-block; padding: 5px 12px; border-radius: 99px; cursor: pointer; font-size: .85rem;
+  border: 1.5px solid var(--champ-bord); background: var(--champ);
+}
+.f-puce input:checked + span { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); font-weight: 800; }
+.f-puce input:focus-visible + span { outline: 3px solid var(--interactif); outline-offset: 2px; }
+
+.f-erreurs { margin: 0; color: var(--ko); font-weight: 700; font-size: .88rem; }
+.f-erreurs ul { margin: 4px 0 0; padding-left: 1.2em; }
+
+/* ---------- Tickets validés ---------- */
+.f-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.f-liste li {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--champ-bord);
+}
+.f-liste .titre { font-weight: 800; }
+.f-liste .detail { font-size: .85rem; color: var(--discret); }
+.f-liste .demande { font-size: .88rem; font-style: italic; margin-top: 4px; }
+.f-vide { color: var(--discret); margin: 0; }
+.f-note-stockage { font-size: .82rem; color: var(--ko); margin: 8px 0 0; }
+.btn.petit { padding: 6px 12px; font-size: .8rem; flex: none; }
+
+@media (max-width: 860px) {
+  .f-form { grid-template-columns: 1fr; }
+  .f-liste li { flex-direction: column; }
+  .barre .f-modele { font-size: .78rem; padding: 5px 10px; }
+}

@@ -508,6 +508,11 @@ def alertes_de_relecture(ticket: dict, mots_sensibles: tuple[str, ...]) -> list[
             continue
         texte = _simplifier(reponse["texte"])
         trouves = [mot for mot in mots_sensibles if _simplifier(mot) in texte]
+        # « admin » est contenu dans « administrateur » : on ne cite que le plus long.
+        trouves = [
+            mot for mot in trouves
+            if not any(autre != mot and _simplifier(mot) in _simplifier(autre) for autre in trouves)
+        ]
         if trouves:
             libelle = "bonne réponse (note 2)" if reponse["note"] == 2 else "réponse en partie vraie (note 1)"
             mots = ", ".join(f"« {mot} »" for mot in trouves)

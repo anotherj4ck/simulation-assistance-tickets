@@ -84,6 +84,16 @@ def test_alertes_sur_les_reponses_notees_2_et_1_seulement():
     assert "« désactiv »" in alertes[1] and "« pare-feu »" in alertes[1]
 
 
+def test_admin_seul_alerte_et_administrateur_n_est_cite_qu_une_fois():
+    ticket = {"reponses": [
+        {"note": 1, "texte": "Je vous donne un accès via mon compte admin."},
+        {"note": 2, "texte": "Je ne peux pas vous donner les droits administrateur."},
+    ]}
+    alertes = alertes_de_relecture(ticket, lire_mots_alertes())
+    assert "« admin »" in alertes[0]
+    assert "« administrateur »" in alertes[1] and "« admin »" not in alertes[1]
+
+
 def test_pas_d_alerte_sans_mot_sensible():
     ticket = {"reponses": [{"note": 2, "texte": "Vos collègues ont-ils le même problème ?"}]}
     assert alertes_de_relecture(ticket, lire_mots_alertes()) == []

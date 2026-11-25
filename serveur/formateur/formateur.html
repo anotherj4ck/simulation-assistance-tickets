@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Mode formateur</title>
+  <link rel="icon" href="data:,"><!-- pas d'icône : évite une requête /favicon.ico inutile -->
+
+  <meta name="description" content="Génération de tickets avec un modèle local, relecture et export. Page servie uniquement par le serveur local.">
+  <!-- Mêmes styles que le site, plus quelques compléments propres à cette page -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="formateur.css">
+  <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+  <div class="decor" aria-hidden="true">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  </div>
+
+  <header class="barre verre">
+    <div>
+      <div class="nom-outil">Mode formateur</div>
+      <div class="info">Générer, relire, corriger et exporter des tickets · serveur local uniquement</div>
+    </div>
+    <div class="barre-droite">
+      <span class="f-modele" id="etat-modele" data-etat="attente" aria-live="polite">Vérification d'Ollama…</span>
+      <button class="btn-rond" id="btn-theme" type="button" aria-label="Passer en thème sombre">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Ollama ou serveur injoignable -->
+    <div class="f-panne" id="panne" role="alert" hidden>
+      <p><strong>Génération indisponible.</strong> <span id="panne-message"></span></p>
+      <button class="btn secondaire" id="btn-reverifier" type="button">Revérifier</button>
+    </div>
+
+    <!-- 1. Paramètres de génération -->
+    <section class="carte verre" aria-labelledby="titre-generation">
+      <h1 id="titre-generation">Générer un ticket</h1>
+      <form class="f-form" id="form-generation" novalidate>
+        <label>Catégorie <select id="g-categorie"></select></label>
+        <label>Difficulté
+          <select id="g-difficulte">
+            <option value="facile">Facile</option>
+            <option value="pas trop difficile" selected>Pas trop difficile</option>
+            <option value="difficile">Difficile</option>
+          </select>
+        </label>
+        <label>Source <select id="g-source"></select></label>
+        <button class="btn principal" id="btn-generer" type="submit">Générer</button>
+      </form>
+      <div class="f-attente" id="attente" role="status" hidden>
+        <span class="f-roue" aria-hidden="true"></span>
+        <span>Génération en cours, comptez 20 à 60 secondes… <span class="chrono" id="chrono"></span></span>
+      </div>
+      <p class="erreur" id="erreur-generation" role="alert" hidden></p>
+      <p class="f-infos" id="message-statut" role="status"></p>
+    </section>
+
+    <!-- 2. Ticket généré, modifiable -->
+    <section id="zone-ticket" aria-labelledby="titre-ticket" hidden>
+      <div class="f-alertes" id="alertes" role="alert" hidden>
+        <strong>⚠ À relire en priorité : passages sensibles dans une réponse notée ✓ ou ~</strong>
+        <ul id="liste-alertes"></ul>
+      </div>
+
+      <section class="panneau verre">
+        <div class="panneau-titre">
+          <h2 id="titre-ticket">Ticket généré : modifiable avant validation</h2>
+          <span class="ticket-id" id="e-id"></span>
+        </div>
+        <form class="ticket" id="form-ticket" novalidate>
+          <p class="f-infos" id="e-infos"></p>
+
+          <div class="champs">
+            <label>Thème <input id="e-theme" type="text" maxlength="60"></label>
+            <label>Source <input id="e-source" type="text" readonly></label>
+            <label>Nom <input id="e-nom" type="text" maxlength="60"></label>
+            <label>Service <input id="e-service" type="text" maxlength="60"></label>
+            <label class="plein" id="champ-objet">Objet du courriel <input id="e-objet" type="text" maxlength="120"></label>
+            <label class="plein" id="champ-canal">Canal (titre affiché) <input id="e-canal" type="text" maxlength="60"></label>
+            <label class="plein">Demande de l'utilisateur <textarea id="e-demande" rows="3"></textarea></label>
+          </div>
+
+          <h3 class="f-titre">Réponses du technicien (✓ bonne · ~ en partie vraie · ✗ fausse · ✗✗ grossière)</h3>
+          <div class="f-reponses" id="e-reponses"></div>
+          <p class="f-avertissement" id="avert-longueur" hidden>La bonne réponse est la plus longue des quatre : elle se reconnaît à sa taille. Raccourcissez-la ou allongez une autre réponse.</p>
+
+          <label class="plein">Point clé <textarea id="e-pointcle" rows="2"></textarea></label>
+
+          <h3 class="f-titre">Qualification attendue (plusieurs valeurs = toutes acceptées)</h3>
+          <div class="f-attendu" id="e-attendu"></div>
+
+          <div class="f-erreurs" id="erreurs-ticket" role="alert" hidden></div>
+          <div class="actions">
+            <p class="aide">Valider ajoute le ticket à la liste ci-dessous ; Rejeter l'abandonne.</p>
+            <button class="btn secondaire" id="btn-rejeter" type="button">Rejeter</button>
+            <button class="btn principal" id="btn-valider" type="submit">Valider</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <!-- 3. Tickets validés -->
+    <section class="carte verre" aria-labelledby="titre-valides">
+      <div class="rapport-actions">
+        <div>
+          <h2 id="titre-valides">Tickets validés (<span id="nb-valides">0</span>)</h2>
+          <p class="sous-titre">Exportés au format de js/tickets.js : à relire, puis à coller dans la liste.</p>
+        </div>
+        <div class="boutons">
+          <button class="btn principal" id="btn-exporter" type="button" disabled>Exporter (JSON)</button>
+          <button class="btn secondaire" id="btn-vider" type="button" disabled>Vider la liste</button>
+        </div>
+      </div>
+      <p class="f-vide" id="liste-vide">Aucun ticket validé pour l'instant.</p>
+      <ol class="f-liste" id="liste-valides"></ol>
+      <p class="f-note-stockage" id="note-stockage" hidden>Mémoire du navigateur indisponible : la liste sera perdue à la fermeture de la page. Pensez à exporter.</p>
+    </section>
+  </main>
+
+  <footer class="pied"><span>Mode formateur</span> · <span>Page locale, non publiée avec le site</span></footer>
+
+  <script src="js/config.js"></script>
+  <script src="formateur.js"></script>
+</body>
+</html>
