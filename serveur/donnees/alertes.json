@@ -1,0 +1,12 @@
+{
+  "_lisezmoi": "Mots sensibles : si une réponse notée 2 ou 1 en contient un, l'API ajoute une alerte de relecture (le ticket n'est pas rejeté). Comparaison sans tenir compte des majuscules, des accents ni des tirets ; un début de mot suffit (« désactiv » trouve « désactivez »). Une liste vide désactive les alertes.",
+  "mots": [
+    "mot de passe",
+    "désactiv",
+    "administrateur",
+    "pare-feu",
+    "antivirus",
+    "voisin",
+    "identifiant"
+  ]
+}

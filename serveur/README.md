@@ -58,7 +58,7 @@ Gardez `--host 127.0.0.1` : le serveur n'est alors accessible que depuis votre p
 | `OLLAMA_MODEL` | **aucun : obligatoire** | Modèle Ollama utilisé (ex. `ministral-3:8b`). Sans elle, le serveur refuse de démarrer et explique quoi faire. |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Adresse d'Ollama. |
 | `OLLAMA_TIMEOUT` | `300` | Délai maximal de chaque appel à Ollama, en secondes (une génération fait jusqu'à 3 appels si des tickets sont rejetés). |
-| `OLLAMA_NUM_CTX` | `8192` | Taille du contexte en tokens, envoyée à chaque génération (`"options": {"num_ctx": …}`). Entier, 4096 au minimum. |
+| `OLLAMA_NUM_CTX` | `8192` | Taille du contexte en tokens, envoyée à chaque génération (`"options": {"num_ctx": …}`). Entier, 6144 au minimum. |
 
 `$env:NOM = "valeur"` ne vaut que pour la fenêtre PowerShell en cours. Pour enregistrer le modèle une fois pour toutes (il faut ensuite ouvrir une nouvelle fenêtre) :
 
@@ -66,11 +66,16 @@ Gardez `--host 127.0.0.1` : le serveur n'est alors accessible que depuis votre p
 [Environment]::SetEnvironmentVariable("OLLAMA_MODEL", "ministral-3:8b", "User")
 ```
 
-Le serveur lit aussi, au démarrage, `js/config.js` (catégories) et `serveur/donnees/profils.json` (profils d'utilisateurs). Si l'un d'eux est illisible ou incomplet, le serveur ne démarre pas.
+Le serveur lit aussi, au démarrage :
+- `js/config.js` (catégories) ;
+- `js/tickets.js` (tickets d'exemple) ;
+- `serveur/donnees/profils.json` (profils d'utilisateurs).
+
+Si l'un d'eux est illisible ou incomplet, le serveur ne démarre pas. La lecture de `js/tickets.js` est plus stricte que celle du site, qui se contente d'ignorer un ticket mal rempli : le serveur refuse de démarrer et indique le ticket et le champ en cause. C'est le cas, par exemple, d'une clé mal orthographiée comme `grossière`, que le site ignorerait sans rien dire.
 
 ### `OLLAMA_NUM_CTX` et la mémoire de la carte graphique
 
-Objectif : garder le modèle entièrement en mémoire vidéo (VRAM) sur une carte de 8 Go. Ollama réserve de la mémoire pour tout le contexte demandé. Son réglage par défaut (16 384 tokens chez nous) fait déborder un modèle 8B sur le processeur, ce qui ralentit nettement la génération. Une génération utilise environ 2 800 tokens (prompt système et consigne ≈ 2 200, ticket ≈ 600), donc 8192 laisse une large marge.
+Objectif : garder le modèle entièrement en mémoire vidéo (VRAM) sur une carte de 8 Go. Ollama réserve de la mémoire pour tout le contexte demandé. Son réglage par défaut (16 384 tokens chez nous) fait déborder un modèle 8B sur le processeur, ce qui ralentit nettement la génération. Une génération utilise environ 4 000 tokens (prompt système et consigne avec ses 2 exemples ≈ 3 500, ticket ≈ 500), donc 8192 laisse une marge confortable. Le serveur refuse les valeurs inférieures à 6144 : en dessous, Ollama tronquerait le début du prompt, c'est-à-dire les règles du générateur. Le journal du serveur affiche ces chiffres à chaque tentative (« Tentative 1 : 3420 tokens en entrée, 483 en sortie »).
 
 Pour vérifier, pendant ou juste après une génération :
 
@@ -81,7 +86,7 @@ ollama ps
 La colonne `PROCESSOR` doit indiquer `100% GPU`. Si elle affiche un partage (`16%/84% CPU/GPU`), baissez la valeur, puis relancez le serveur :
 
 ```powershell
-$env:OLLAMA_NUM_CTX = "4096"
+$env:OLLAMA_NUM_CTX = "6144"
 ```
 
 Mesures avec `ministral-3:8b` sur une RTX 4060 Laptop (8 Go) :
@@ -90,9 +95,10 @@ Mesures avec `ministral-3:8b` sur une RTX 4060 Laptop (8 Go) :
 |---|---|---|---|
 | 16384 (défaut d'Ollama) | 7,8 Go | 30 % CPU / 70 % GPU | 25 à 50 s |
 | 8192 | 6,6 Go | 16 % CPU / 84 % GPU | ≈ 30 s |
-| 4096 | 6,0 Go | 8 % CPU / 92 % GPU | ≈ 21 s |
+| 6144 | 6,3 Go | 13 % CPU / 87 % GPU | ≈ 28 s |
+| 4096 (n'est plus accepté depuis l'ajout des exemples) | 6,0 Go | 8 % CPU / 92 % GPU | ≈ 21 s |
 
-Sur cette carte, même 4096 ne suffit pas pour ce modèle : le reste vient du poids du modèle lui-même, environ 6 Go avec son module de vision, et de la mémoire déjà prise par Windows. Pour atteindre 100 % GPU, il faut un modèle plus léger, ou réduire le cache dans la configuration d'Ollama lui-même (variables `OLLAMA_FLASH_ATTENTION=1` et `OLLAMA_KV_CACHE_TYPE=q8_0`, à définir avant de lancer Ollama). Ces deux variables ne concernent pas ce serveur.
+Ces mesures datent d'avant l'ajout des exemples dans la consigne. Sur cette carte, même 4096 ne suffisait pas pour ce modèle : le reste vient du poids du modèle lui-même, environ 6 Go avec son module de vision, et de la mémoire déjà prise par Windows. Pour atteindre 100 % GPU, il faut un modèle plus léger, ou réduire le cache dans la configuration d'Ollama lui-même (variables `OLLAMA_FLASH_ATTENTION=1` et `OLLAMA_KV_CACHE_TYPE=q8_0`, à définir avant de lancer Ollama). Ces deux variables ne concernent pas ce serveur.
 
 ## API
 
@@ -129,11 +135,13 @@ Réponse :
 ```json
 {
   "ticket": { "id": "ia-…", "theme": "…", "nom": "…", "source": "…", "reponses": [ … ], "attendu": { … } },
+  "alertes": [ "réponse en partie vraie (note 1) : contient « mot de passe », à relire : « … »" ],
   "tentatives": 1,
   "modele": "ministral-3:8b",
   "consigne": {
     "categorie": "Réseau", "source": "Direct", "difficulte": "pas trop difficile", "avec_grossiere": true,
-    "profil": { "nom": "Mme Brunet", "service": "RH", "ton": "pressé, il a une échéance proche", "aisance": "…" }
+    "profil": { "nom": "Mme Brunet", "service": "RH", "ton": "pressé, il a une échéance proche", "aisance": "…" },
+    "exemples": ["t13-vpn", "t23-wi-fi-en-salle-de-reunion"]
   }
 }
 ```
@@ -177,7 +185,27 @@ En cas de rejet, la génération est relancée jusqu'à 2 fois ; le modèle reç
 
 Le nom et le service sont imposés par le schéma : le modèle ne peut pas écrire autre chose. Le ton et l'aisance sont donnés dans la consigne ; ils ne peuvent pas être vérifiés automatiquement. Pour enrichir la variété, il suffit d'ajouter des lignes aux listes du fichier, puis de redémarrer le serveur. Chaque liste doit rester non vide, et les services restent sans accord de genre (« comptabilité », pas « comptable »).
 
+**Exemples (few-shot).** À chaque génération, le serveur choisit au hasard 2 tickets de `js/tickets.js`, de préférence dans la catégorie demandée, et complète avec d'autres catégories s'il n'y en a pas assez. Il les met dans la consigne, au format JSON attendu, avec une règle : ils montrent le niveau, le ton et la longueur attendus, mais leur scénario ne doit jamais être recopié.
+
+Les tickets qui ne respectent pas les règles du générateur ne servent pas d'exemples, pour ne pas enseigner au modèle un défaut que le serveur rejette ensuite. Il s'agit surtout de ceux dont la bonne réponse est la plus longue : t14, t15, t17, t19, t20, t21, t24, t25, t26 et t30 (20 exemples sur 30 restent utilisables). Cette exclusion est calculée, pas écrite en dur : un ticket corrigé redevient automatiquement un exemple. La liste s'affiche au démarrage du serveur.
+
 **Corrections automatiques, sans rejet :** le premier caractère du point clé est mis en minuscule (sauf s'il commence par un sigle comme « VPN »), un éventuel préfixe « Point clé : » est retiré, et les espaces superflus sont supprimés.
+
+**Ordre des réponses.** Le schéma impose au modèle l'ordre fausse, fausse (la grossière en second, si elle est demandée), en partie vraie, bonne. Il écrit ainsi la bonne réponse en dernier, en connaissant déjà la longueur des trois autres. Le ticket renvoyé est remis dans l'ordre habituel de `js/tickets.js` (bonne réponse en premier), et le site mélange l'ordre à l'affichage. Les exemples de la consigne sont présentés dans le même ordre que le schéma.
+
+**Longueur de la demande.** Elle est demandée au modèle en phrases (« 2 phrases courtes au plus »), parce qu'il compte mal les caractères. Le contrôle côté serveur reste en caractères (rejet au-delà de 250).
+
+**Règles métier.** Le prompt contient une liste de fautes interdites dans les réponses notées 2 et 1, et la consigne la rappelle à chaque génération :
+- demander, dicter ou transmettre un mot de passe ;
+- agir sur un compte sans vérifier l'identité ;
+- désactiver l'antivirus ou le pare-feu ;
+- accorder des droits administrateur pour contourner une procédure ;
+- utiliser un réseau ou un compte tiers ;
+- face à un rançongiciel suspecté, éteindre le poste au lieu de l'isoler.
+
+Ces fautes restent la matière des réponses grossières.
+
+**Alertes de relecture (non bloquantes).** Quand une réponse notée 2 ou 1 contient un mot de [`donnees/alertes.json`](donnees/alertes.json) (mot de passe, désactiv, administrateur, pare-feu…), la réponse de l'API contient une alerte dans `alertes`. Le ticket n'est pas rejeté : une bonne réponse peut très bien dire « ne communiquez jamais votre mot de passe ». L'alerte signale seulement un passage à relire en priorité. La comparaison ignore majuscules, accents et tirets, et un début de mot suffit (« désactiv » trouve « désactivez »). On peut modifier la liste sans toucher au code, puis redémarrer le serveur ; une liste vide désactive les alertes.
 
 Les contrôles garantissent la forme, pas la justesse pédagogique : **relisez chaque ticket généré** (bonne réponse vraiment la meilleure, réponse grossière vraiment inacceptable, qualification juste) avant de l'ajouter à `js/tickets.js`.
 
@@ -201,7 +229,9 @@ serveur/
   app.py                       Application FastAPI : routes, appels à Ollama, fichiers statiques
   configuration.py             Variables d'environnement, lecture des catégories et des profils
   generateur.py                Consigne (tirages au sort), schéma JSON, validation, contrôles, format final
+  exemples.py                  Lecture stricte de js/tickets.js, choix et mise en forme des exemples
   donnees/profils.json         Listes tirées au sort : prénoms, noms, services, tons, aisances
+  donnees/alertes.json         Mots sensibles qui déclenchent une alerte de relecture
   prompts/generateur_ticket.md Prompt système du générateur
   requirements.txt             Dépendances (versions épinglées)
   requirements-dev.txt         Dépendances de test (pytest)

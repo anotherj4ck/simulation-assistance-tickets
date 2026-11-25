@@ -35,6 +35,7 @@ from .configuration import (
     Source,
     TypeTicket,
 )
+from .exemples import TicketSite, choisir_exemples, vers_format_genere
 
 CHEMIN_PROMPT = Path(__file__).resolve().parent / "prompts" / "generateur_ticket.md"
 
@@ -52,9 +53,21 @@ PROBABILITE_CIVILITE = 0.9
 
 # Longueurs visées (caractères), mesurées sur js/tickets.js. Elles sont aussi
 # écrites dans prompts/generateur_ticket.md : modifier les deux ensemble.
-CIBLE_DEMANDE = (60, 150)
+# (La demande, elle, est visée en phrases : voir LONGUEUR_DEMANDE_EN_PHRASES.)
 CIBLE_REPONSE = (120, 190)
 CIBLE_POINT_CLE = (80, 250)
+
+# La demande est décrite au modèle en phrases : il compte mal les caractères.
+# Le contrôle côté serveur, lui, reste en caractères (LONGUEUR_MAX_DEMANDE).
+LONGUEUR_DEMANDE_EN_PHRASES = "2 phrases courtes au plus"
+
+# Rappel court des règles métier (détaillées dans prompts/generateur_ticket.md).
+RAPPEL_REGLES_METIER = (
+    "ne jamais demander, dicter ni transmettre un mot de passe ; vérifier l'identité avant toute action"
+    " sur un compte ; ne jamais désactiver l'antivirus ni le pare-feu ; ne jamais accorder de droits"
+    " administrateur pour contourner une procédure ; ne jamais utiliser un réseau ou un compte tiers ;"
+    " rançongiciel suspecté : isoler le poste du réseau sans l'éteindre"
+)
 
 # Rejet seulement si une longueur dépasse largement ces cibles.
 LONGUEUR_MAX_DEMANDE = 250
@@ -110,6 +123,7 @@ class Consigne:
     difficulte: str
     avec_grossiere: bool
     profil: Profil
+    exemples: tuple[TicketSite, ...]
 
 
 def tirer_consigne(
@@ -117,16 +131,18 @@ def tirer_consigne(
     difficulte: str,
     source: str | None,
     profils: Profils,
+    exemples: tuple[TicketSite, ...],
     alea: random.Random = _alea,
 ) -> Consigne:
     """Complète la demande : source tirée au sort si absente, réponse grossière
-    ou non, profil de l'utilisateur."""
+    ou non, profil de l'utilisateur, tickets d'exemple."""
     return Consigne(
         categorie=categorie,
         source=source or alea.choice(SOURCES),
         difficulte=difficulte,
         avec_grossiere=alea.random() < PROBABILITE_TICKET_AVEC_GROSSIERE,
         profil=tirer_profil(profils, alea),
+        exemples=choisir_exemples(exemples, categorie, alea),
     )
 
 
@@ -146,7 +162,16 @@ def message_utilisateur(consigne: Consigne, motifs_precedents: list[str] | None 
 
     profil = consigne.profil
     lignes = [
+        f"Voici {len(consigne.exemples)} tickets de référence, au format JSON attendu. Ils montrent le niveau,"
+        " le ton et la longueur attendus. Ne recopie jamais leur scénario : ni leur problème, ni leurs"
+        " phrases, ni leurs réponses. Invente un cas différent.",
+    ]
+    for n, exemple in enumerate(consigne.exemples, 1):
+        lignes += ["", f"Exemple {n} :", json.dumps(vers_format_genere(exemple), ensure_ascii=False, indent=2)]
+    lignes += [
+        "",
         "Rédige un nouveau ticket, sur un cas concret, avec ces paramètres :",
+        f"- un problème différent de ceux des exemples, mais qui relève bien de la catégorie {consigne.categorie}",
         f"- utilisateur : nom = « {profil.nom} », service = « {profil.service} » (recopie-les tels quels) ;"
         f" c'est {'une femme' if profil.genre == 'femme' else 'un homme'}, accorde les mots en conséquence",
         f"- ton de l'utilisateur : {profil.ton}",
@@ -155,15 +180,17 @@ def message_utilisateur(consigne: Consigne, motifs_precedents: list[str] | None 
         f"- source : {consigne.source} ({precision_source})",
         f"- difficulté : {consigne.difficulte}",
         f"- réponse grossière : {grossiere}",
-        f"- longueurs : demande de {CIBLE_DEMANDE[0]} à {CIBLE_DEMANDE[1]} caractères (1 à 3 phrases courtes),"
-        f" quel que soit le ton : il se voit dans les mots choisis, pas dans la longueur ;"
-        f" chaque réponse de {CIBLE_REPONSE[0]} à {CIBLE_REPONSE[1]} caractères",
+        f"- demande : {LONGUEUR_DEMANDE_EN_PHRASES}, quel que soit le ton : il se voit dans les mots"
+        " choisis, pas dans la longueur",
+        f"- réponses : chacune de {CIBLE_REPONSE[0]} à {CIBLE_REPONSE[1]} caractères, dans l'ordre imposé :"
+        " les deux fausses, puis la réponse en partie vraie, puis la bonne en dernier ; la bonne doit être"
+        " plus courte que la plus longue des trois autres",
+        f"- règles métier, pour les réponses notées 2 et 1 : {RAPPEL_REGLES_METIER}",
     ]
     if motifs_precedents:
         lignes += ["", "Ta tentative précédente a été rejetée pour ces raisons :"]
         lignes += [f"- {motif}" for motif in motifs_precedents]
         lignes.append("Corrige ces points dans le nouveau ticket.")
-    lignes += ["", "Rappel : la bonne réponse (note 2) ne doit pas être la plus longue des quatre."]
     return "\n".join(lignes)
 
 
@@ -179,8 +206,24 @@ def schema_ticket(categories: tuple[str, ...], consigne: Consigne) -> dict:
     - « objet » et « canal » sont toujours présents : chaîne quand la source
       l'exige, null sinon (le serveur revérifie de toute façon).
     - « nom » et « service » ne peuvent prendre que la valeur tirée au sort.
+    - Les 4 réponses sont imposées dans cet ordre : fausse, fausse (grossière
+      si la consigne le demande), en partie vraie, bonne. Le modèle écrit
+      ainsi la bonne réponse en dernier, en connaissant déjà la longueur des
+      trois autres. L'ordre affiché importe peu : le site le mélange.
     """
     texte = {"type": "string"}
+
+    def reponse(note: int, grossiere: bool) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "note": {"type": "integer", "enum": [note]},
+                "grossiere": {"type": "boolean", "enum": [grossiere]},
+                "texte": texte,
+            },
+            "required": ["note", "grossiere", "texte"],
+            "additionalProperties": False,
+        }
 
     def liste(valeurs: tuple[str, ...]) -> dict:
         return {
@@ -202,18 +245,16 @@ def schema_ticket(categories: tuple[str, ...], consigne: Consigne) -> dict:
             "demande": texte,
             "reponses": {
                 "type": "array",
+                # « items: false » n'est pas accepté par Ollama ; minItems et
+                # maxItems suffisent à limiter le tableau aux 4 réponses.
+                "prefixItems": [
+                    reponse(0, False),
+                    reponse(0, consigne.avec_grossiere),
+                    reponse(1, False),
+                    reponse(2, False),
+                ],
                 "minItems": 4,
                 "maxItems": 4,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "note": {"type": "integer", "enum": [0, 1, 2]},
-                        "grossiere": {"type": "boolean"},
-                        "texte": texte,
-                    },
-                    "required": ["note", "grossiere", "texte"],
-                    "additionalProperties": False,
-                },
             },
             "pointCle": texte,
             "attendu": {
@@ -373,7 +414,7 @@ def motifs_de_rejet(ticket: TicketGenere, consigne: Consigne) -> list[str]:
     if len(ticket.demande) > LONGUEUR_MAX_DEMANDE:
         motifs.append(
             f"demande trop longue ({len(ticket.demande)} caractères, au-delà du maximum de "
-            f"{LONGUEUR_MAX_DEMANDE}) : vise {CIBLE_DEMANDE[0]} à {CIBLE_DEMANDE[1]} caractères"
+            f"{LONGUEUR_MAX_DEMANDE}) : {LONGUEUR_DEMANDE_EN_PHRASES}"
         )
     for i, reponse in enumerate(ticket.reponses, 1):
         if len(reponse.texte) > LONGUEUR_MAX_REPONSE:
@@ -429,9 +470,12 @@ def normaliser(ticket: TicketGenere, consigne: Consigne) -> dict:
     if consigne.source == "Autre":
         resultat["canal"] = ticket.canal
     resultat["demande"] = ticket.demande
+    # Ordre de js/tickets.js : bonne, en partie vraie, fausse, fausse grossière.
+    # (Le modèle les écrit dans l'ordre inverse ; le site les mélange à l'affichage.)
+    reponses = sorted(ticket.reponses, key=lambda r: (-r.note, r.grossiere))
     resultat["reponses"] = [
         {"note": r.note, **({"grossiere": True} if r.grossiere else {}), "texte": r.texte}
-        for r in ticket.reponses
+        for r in reponses
     ]
     resultat["pointCle"] = minuscule_initiale(ticket.pointCle)
     resultat["attendu"] = {
@@ -439,6 +483,36 @@ def normaliser(ticket: TicketGenere, consigne: Consigne) -> dict:
         for champ in ("type", "categorie", "urgence", "impact")
     }
     return resultat
+
+
+# --- Alertes de relecture (non bloquantes) ------------------------------------
+
+
+def _simplifier(texte: str) -> str:
+    """Minuscules, sans accents, ponctuation et tirets remplacés par des espaces :
+    « Pare-feu » et « pare feu », « désactivez » et « DESACTIVEZ » se retrouvent."""
+    sans_accents = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", sans_accents.casefold()).split())
+
+
+def alertes_de_relecture(ticket: dict, mots_sensibles: tuple[str, ...]) -> list[str]:
+    """Signale les réponses notées 2 ou 1 qui contiennent un mot sensible.
+
+    Ce n'est pas un rejet : une bonne réponse peut très bien dire « ne donnez
+    jamais votre mot de passe ». L'alerte attire seulement l'attention du
+    formateur sur les passages à relire en priorité.
+    """
+    alertes = []
+    for reponse in ticket["reponses"]:
+        if reponse["note"] not in (1, 2):
+            continue
+        texte = _simplifier(reponse["texte"])
+        trouves = [mot for mot in mots_sensibles if _simplifier(mot) in texte]
+        if trouves:
+            libelle = "bonne réponse (note 2)" if reponse["note"] == 2 else "réponse en partie vraie (note 1)"
+            mots = ", ".join(f"« {mot} »" for mot in trouves)
+            alertes.append(f"{libelle} : contient {mots}, à relire : « {reponse['texte']} »")
+    return alertes
 
 
 def produire_ticket(contenu: str, consigne: Consigne, categories: tuple[str, ...]) -> dict:

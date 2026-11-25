@@ -35,13 +35,14 @@ OLLAMA_URL_PAR_DEFAUT = "http://127.0.0.1:11434"
 OLLAMA_TIMEOUT_PAR_DEFAUT = 300.0  # secondes
 
 # Taille du contexte demandée à Ollama (tokens). 8192 suffit largement
-# (mesuré : prompt système + consigne ≈ 2 200 tokens, ticket ≈ 600) et limite la
+# (mesuré : prompt système + consigne avec 2 exemples ≈ 3 500 tokens, ticket ≈ 500) et limite la
 # mémoire du cache, pour garder autant que possible le modèle en VRAM sur une
 # carte de 8 Go (voir serveur/README.md).
 OLLAMA_NUM_CTX_PAR_DEFAUT = 8192
-OLLAMA_NUM_CTX_MINIMUM = 4096  # en dessous, le prompt et le ticket risquent d'être tronqués
+OLLAMA_NUM_CTX_MINIMUM = 6144  # environ 4 000 tokens utilisés : en dessous, Ollama tronquerait le début du prompt
 
 PROFILS_JSON = Path(__file__).resolve().parent / "donnees" / "profils.json"
+ALERTES_JSON = Path(__file__).resolve().parent / "donnees" / "alertes.json"
 
 
 class ErreurConfiguration(Exception):
@@ -192,3 +193,23 @@ def lire_categories(chemin: Path = CONFIG_JS) -> tuple[str, ...]:
     if len(set(categories)) != len(categories):
         raise ErreurConfiguration(f"la liste « categories » de {chemin} contient des doublons.")
     return categories
+
+
+# --- Mots sensibles pour les alertes de relecture : serveur/donnees/alertes.json
+
+
+def lire_mots_alertes(chemin: Path = ALERTES_JSON) -> tuple[str, ...]:
+    """Charge la liste « mots ». Fichier absent ou mal formé = ErreurConfiguration.
+    Une liste vide est permise (alertes désactivées) ; le serveur l'affiche au démarrage."""
+    try:
+        donnees = json.loads(chemin.read_text(encoding="utf-8"))
+    except OSError as erreur:
+        raise ErreurConfiguration(f"impossible de lire {chemin} ({erreur.strerror or erreur}).") from None
+    except (UnicodeDecodeError, json.JSONDecodeError) as erreur:
+        raise ErreurConfiguration(f"{chemin} n'est pas un JSON valide en UTF-8 ({erreur}).") from None
+    mots = donnees.get("mots") if isinstance(donnees, dict) else None
+    if not isinstance(mots, list):
+        raise ErreurConfiguration(f"{chemin} : la liste « mots » est absente.")
+    if not all(isinstance(m, str) and m.strip() for m in mots):
+        raise ErreurConfiguration(f"{chemin} : la liste « mots » ne doit contenir que des textes non vides.")
+    return tuple(m.strip() for m in mots)

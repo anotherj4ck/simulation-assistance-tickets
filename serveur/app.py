@@ -27,11 +27,14 @@ from .configuration import (
     ErreurConfiguration,
     Source,
     lire_categories,
+    lire_mots_alertes,
     lire_profils,
     lire_reglages,
 )
+from .exemples import lire_exemples
 from .generateur import (
     TicketRejete,
+    alertes_de_relecture,
     lire_prompt_systeme,
     message_utilisateur,
     produire_ticket,
@@ -45,6 +48,10 @@ try:
     REGLAGES = lire_reglages()
     CATEGORIES = lire_categories()
     PROFILS = lire_profils()
+    # Tickets de js/tickets.js utilisables comme exemples (few-shot) ; ceux qui
+    # ne respectent pas les règles du générateur sont écartés.
+    EXEMPLES, EXEMPLES_ECARTES = lire_exemples(CATEGORIES)
+    MOTS_ALERTES = lire_mots_alertes()
     PROMPT_SYSTEME = lire_prompt_systeme()
 except ErreurConfiguration as erreur:
     raise SystemExit(f"\n[serveur] Démarrage impossible : {erreur}\n") from None
@@ -81,6 +88,14 @@ async def cycle_de_vie(app: FastAPI):
     log.info(
         "Modèle Ollama : %s (%s), contexte %d tokens",
         REGLAGES.ollama_modele, REGLAGES.ollama_url, REGLAGES.ollama_num_ctx,
+    )
+    log.info(
+        "Exemples : %d tickets de js/tickets.js ; écartés (bonne réponse la plus longue, etc.) : %s",
+        len(EXEMPLES), ", ".join(EXEMPLES_ECARTES) or "aucun",
+    )
+    log.info(
+        "Alertes de relecture : %s",
+        f"{len(MOTS_ALERTES)} mots sensibles" if MOTS_ALERTES else "désactivées (liste vide dans alertes.json)",
     )
     try:
         yield
@@ -204,7 +219,7 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             detail=f"Catégorie inconnue : « {demande.categorie} ». Valeurs possibles : {', '.join(CATEGORIES)}.",
         )
 
-    consigne = tirer_consigne(demande.categorie, demande.difficulte, demande.source, PROFILS)
+    consigne = tirer_consigne(demande.categorie, demande.difficulte, demande.source, PROFILS, EXEMPLES)
     schema = schema_ticket(CATEGORIES, consigne)
     motifs: list[str] = []
 
@@ -224,6 +239,12 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
         contenu = (reponse.get("message") or {}).get("content")
         if not isinstance(contenu, str):
             raise ErreurOllama("Ollama a renvoyé une réponse sans message.")
+        # Utile pour régler OLLAMA_NUM_CTX : entrée + sortie doivent y tenir.
+        log.info(
+            "Tentative %d : %s tokens en entrée, %s en sortie (contexte %d), %.1f s",
+            tentative, reponse.get("prompt_eval_count", "?"), reponse.get("eval_count", "?"),
+            REGLAGES.ollama_num_ctx, reponse.get("total_duration", 0) / 1e9,
+        )
 
         try:
             ticket = produire_ticket(contenu, consigne, CATEGORIES)
@@ -234,6 +255,8 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
 
         return {
             "ticket": ticket,
+            # Non bloquant : passages à relire en priorité par le formateur.
+            "alertes": alertes_de_relecture(ticket, MOTS_ALERTES),
             "tentatives": tentative,
             "modele": REGLAGES.ollama_modele,
             "consigne": {
@@ -247,6 +270,7 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
                     "ton": consigne.profil.ton,
                     "aisance": consigne.profil.aisance,
                 },
+                "exemples": [e.id for e in consigne.exemples],
             },
         }
 

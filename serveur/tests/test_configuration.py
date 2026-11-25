@@ -55,7 +55,7 @@ def test_num_ctx_vaut_8192_par_defaut():
     assert lire_reglages({"OLLAMA_MODEL": "m"}).ollama_num_ctx == 8192
 
 
-@pytest.mark.parametrize("valeur", ["abc", "8192.5", "1024"])
+@pytest.mark.parametrize("valeur", ["abc", "8192.5", "1024", "4096"])
 def test_num_ctx_invalide_bloque_le_demarrage(valeur):
     with pytest.raises(ErreurConfiguration, match="OLLAMA_NUM_CTX"):
         lire_reglages({"OLLAMA_MODEL": "m", "OLLAMA_NUM_CTX": valeur})

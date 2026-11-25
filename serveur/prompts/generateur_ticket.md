@@ -20,7 +20,7 @@ L'utilisateur travaille dans une organisation ordinaire (PME, collectivité, ass
 
 ## Les quatre réponses du technicien
 
-Exactement 4 réponses dans `reponses`, chacune avec `note`, `grossiere` et `texte` :
+Exactement 4 réponses dans `reponses`, chacune avec `note`, `grossiere` et `texte`, écrites dans cet ordre imposé : les deux fausses (la grossière en second, si elle est demandée), puis la réponse en partie vraie, puis la bonne réponse en dernier.
 
 - 1 bonne réponse (note 2) : ce qu'un bon technicien dirait ou ferait en premier. Souvent : poser la bonne question de diagnostic, rassurer, protéger (sécurité), ou suivre la procédure.
 - 1 réponse en partie vraie (note 1) : utile mais incomplète, prématurée ou dans le mauvais ordre (une bonne action sans diagnostic, une solution trop lente…).
@@ -31,11 +31,22 @@ Exactement 4 réponses dans `reponses`, chacune avec `note`, `grossiere` et `tex
 
 Le `texte` d'une réponse est ce que le technicien dit ou écrit à l'utilisateur, au style direct. Il ne donne jamais d'indice sur sa note (pas de « bonne réponse », « (faux) », « idéalement »).
 
+## Règles métier : interdites dans les réponses notées 2 et 1
+
+Une réponse notée 2 (bonne) ou 1 (en partie vraie) ne viole JAMAIS une de ces règles. Une réponse qui en viole une est forcément notée 0 ; c'est d'ailleurs la matière idéale d'une réponse grossière.
+
+1. Ne jamais demander, dicter ni transmettre un mot de passe, ni à l'oral ni par écrit, pas même pour « vérifier ». Une réinitialisation passe par la procédure prévue (portail, lien, code temporaire), pas par un mot de passe communiqué par le technicien.
+2. Vérifier l'identité de l'utilisateur avant toute action sur un compte (déverrouillage, réinitialisation, ouverture de droits), surtout par téléphone ou par courriel.
+3. Ne jamais désactiver l'antivirus ni le pare-feu, même « juste pour tester ».
+4. Ne jamais accorder de droits administrateur pour contourner une procédure (installation, accès refusé).
+5. Ne jamais utiliser un réseau ou un compte tiers : pas de Wi-Fi d'un voisin ou d'un lieu public, pas de compte d'un collègue, pas de session prêtée.
+6. Rançongiciel suspecté : isoler le poste du réseau (débrancher le câble, couper le Wi-Fi) sans l'éteindre, puis prévenir l'équipe sécurité.
+
 ## Longueurs : la bonne réponse ne doit pas se reconnaître à sa taille
 
 - Les 4 réponses ont des longueurs proches : entre 120 et 190 caractères chacune (environ 20 à 32 mots, souvent deux phrases).
-- La bonne réponse ne doit JAMAIS être la plus longue des quatre. Écris-la de façon concise, puis allonge les réponses fausses (justification, détail technique, ton assuré) pour qu'au moins une soit plus longue qu'elle.
-- `demande` : 60 à 150 caractères (environ 10 à 25 mots, 1 à 3 phrases courtes). Cette longueur ne dépend pas du profil : un utilisateur bavard, perdu ou agacé le montre par ses mots, pas par la longueur de son message.
+- La bonne réponse ne doit JAMAIS être la plus longue des quatre. Les réponses fausses s'écrivent en premier : donne-leur du corps (justification, détail technique, ton assuré). Quand tu écris la bonne réponse, en dernier, tu connais déjà la longueur des trois autres : fais-la plus courte que la plus longue d'entre elles.
+- `demande` : 2 phrases courtes au plus. Cette longueur ne dépend pas du profil : un utilisateur bavard, perdu ou agacé le montre par ses mots, pas par la longueur de son message.
 - `pointCle` : 80 à 250 caractères.
 
 ## Le point clé
@@ -65,6 +76,8 @@ Grille Impact (qui est touché) :
 - Haute : tout un service.
 - Très haute : toute l'organisation.
 
+Règle impérative pour l'impact : **une seule personne concernée = impact Basse, sauf risque de propagation (sécurité)**. L'urgence ou l'agacement de l'utilisateur ne changent pas l'impact : un utilisateur seul et bloqué, même pressé ou important, reste en impact Basse (son blocage se traduit dans l'urgence). Ne monte à Moyenne ou au-dessus que si plusieurs personnes sont touchées, ou si un incident de sécurité risque de s'étendre (virus, hameçonnage, fuite de données).
+
 Le cas le plus courant est un utilisateur seul (impact Basse), bloqué (urgence Haute) ou gêné (urgence Moyenne).
 
 ## La difficulté
@@ -77,29 +90,4 @@ Même « difficile », le cas reste à la portée d'un technicien de niveau 1 en
 
 ## Format de sortie
 
-Réponds uniquement avec l'objet JSON, sans texte autour. Voici un exemple de forme et de ton ; invente un autre cas, ne le recopie pas :
-
-```json
-{
-  "theme": "Imprimante",
-  "nom": "Lucas",
-  "service": "stagiaire RH",
-  "source": "Courriel",
-  "objet": "L'imprimante n'imprime plus",
-  "canal": null,
-  "demande": "L'imprimante ne sort rien. J'ai lancé mon document quatre fois.",
-  "reponses": [
-    { "note": 2, "grossiere": false, "texte": "Est-ce que vos collègues arrivent à imprimer sur cette imprimante ? Et y a-t-il un message ou un voyant orange sur son petit écran ?" },
-    { "note": 1, "grossiere": false, "texte": "Ouvrez la file d'attente de l'imprimante depuis les paramètres de Windows, supprimez vos quatre documents bloqués, puis relancez une seule impression pour voir." },
-    { "note": 0, "grossiere": false, "texte": "C'est sûrement le pilote qui pose problème sur votre poste. Je prends la main à distance pour le désinstaller et le réinstaller proprement, ça prendra une dizaine de minutes." },
-    { "note": 0, "grossiere": true, "texte": "Relancez-le encore une fois. Les imprimantes réseau mettent parfois du temps à recevoir les documents, il faut un peu insister avant que ça parte." }
-  ],
-  "pointCle": "savoir d'abord si c'est le poste ou l'imprimante, avant toute action lourde.",
-  "attendu": {
-    "type": ["Incident"],
-    "categorie": ["Impression"],
-    "urgence": ["Moyenne"],
-    "impact": ["Basse"]
-  }
-}
-```
+Réponds uniquement avec l'objet JSON, sans texte autour, avec exactement les mêmes champs que les tickets de référence donnés dans le message de l'utilisateur. Ces exemples sont écrits par un formateur : imite leur niveau, leur ton et leur longueur, mais n'en recopie jamais le scénario.
