@@ -112,6 +112,10 @@ def test_delai_depasse_tirage_habituel(page, site):
         "pas du json",
         json.dumps({"tickets": SERIE[:4]}),                           # pas 5 tickets
         json.dumps({"tickets": SERIE[:4] + [{"id": "incomplet"}]}),  # ticket invalide
+        json.dumps({"mode": "fixe", "tickets": TICKETS[:6]}),        # fixe : pas 5 tickets
+        json.dumps({"mode": "tirage", "tickets": SERIE[:4]}),        # tirage : moins de 5
+        json.dumps({"mode": "tirage", "tickets": SERIE + SERIE[:1]}),  # tirage : identifiant en double
+        json.dumps({"mode": "aleatoire", "tickets": SERIE}),         # mode inconnu
     ],
 )
 def test_reponse_invalide_tirage_habituel(page, site, corps):
@@ -201,11 +205,12 @@ def fichier_json(tmp_path, nom, contenu):
     return str(chemin)
 
 
-def ouvrir_formateur(page, serveur_local, liste_initiale=()):
+def ouvrir_formateur(page, serveur_local, liste_initiale=(), accepter_dialogues=True):
     page.add_init_script(
         f"localStorage.setItem('formateur.ticketsValides', {json.dumps(json.dumps(list(liste_initiale)))});"
     )
-    page.on("dialog", lambda d: d.accept())
+    if accepter_dialogues:
+        page.on("dialog", lambda d: d.accept())
     page.goto(f"{serveur_local}/formateur.html")
     sync_api.expect(page.locator("#serie-etat")).not_to_have_text("Vérification…")
 
@@ -240,7 +245,7 @@ def test_import_doublons_refus_retrait_puis_publication(page, serveur_local, tmp
 
     # La série se publie comme d'habitude, dans l'ordre de la liste.
     page.click("#btn-publier")
-    sync_api.expect(page.locator("#serie-etat")).to_contain_text("Publiée le")
+    sync_api.expect(page.locator("#serie-etat")).to_contain_text("Série fixe, 5 tickets, publiée le")
     attendus = [f"{n + 1}. {t[i]['theme']}" for n, i in enumerate((0, 1, 4, 5, 2))]
     assert page.locator("#serie-tickets .titre").all_inner_texts() == attendus
     assert page.erreurs == []
@@ -274,3 +279,150 @@ def test_mention_liste_par_adresse_avec_infobulle(page, serveur_local):
     sync_api.expect(infobulle).to_be_visible()
     sync_api.expect(infobulle).to_contain_text("localhost")
     sync_api.expect(infobulle).to_contain_text("127.0.0.1")
+
+
+# --- Modes de publication : « tirage » côté apprenant ----------------------------
+
+SELECTION = TICKETS[:12]  # sélection publiée en mode « tirage »
+
+
+def jouer_session(page):
+    """Joue une session complète ; renvoie les identifiants des tickets reçus, dans l'ordre."""
+    recus = []
+    for n in range(5):
+        sync_api.expect(page.locator("#choix .reponse")).to_have_count(4)
+        chat = page.locator("#chat").inner_text()
+        trouves = [t["id"] for t in SELECTION if t["demande"] in chat]
+        assert len(trouves) == 1, f"ticket {n + 1} introuvable dans la sélection"
+        recus.append(trouves[0])
+        page.locator("#choix .reponse").first.click()
+        page.fill("#t-titre", f"Ticket {n + 1}")
+        page.click("#btn-enregistrer")
+    sync_api.expect(page.locator("#ecran-rapport")).to_be_visible()
+    return recus
+
+
+def test_tirage_n_tickets_distincts_de_la_selection_a_chaque_session(page, site):
+    corps = json.dumps({"mode": "tirage", "publiee_le": "2026-11-26T10:00:00+01:00", "tickets": SELECTION})
+    page.route("**/api/serie", lambda route: route.fulfill(status=200, content_type="application/json", body=corps))
+    page.on("dialog", lambda d: d.accept())  # « Nouvelle session » sans avoir téléchargé le rapport
+    page.goto(f"{site}/index.html")
+    sync_api.expect(page.locator("#info-serie")).to_have_text("Tickets choisis par votre formateur")
+    commencer(page)
+
+    sessions = []
+    for numero in range(3):
+        recus = jouer_session(page)
+        assert len(recus) == 5 and len(set(recus)) == 5, recus  # toujours 5, sans doublon
+        sessions.append(recus)
+        if numero < 2:
+            page.click("#btn-recommencer")
+            sync_api.expect(page.locator("#ecran-simulation")).to_be_visible()
+    # Un nouveau tirage à chaque session : 3 sessions identiques (même sélection,
+    # même ordre) n'arrivent qu'avec une chance sur 95 040².
+    assert len({tuple(s) for s in sessions}) > 1, sessions
+    assert page.erreurs == []
+
+
+def test_serie_fixe_explicite_message_d_accueil(page, site):
+    corps = json.dumps({"mode": "fixe", "publiee_le": "2026-11-26T10:00:00+01:00", "tickets": SERIE})
+    page.route("**/api/serie", lambda route: route.fulfill(status=200, content_type="application/json", body=corps))
+    page.goto(f"{site}/index.html")
+    sync_api.expect(page.locator("#info-serie")).to_have_text("Série préparée par votre formateur")
+    commencer(page)
+    sync_api.expect(page.locator("#chat")).to_contain_text(SERIE[0]["demande"])
+
+
+# --- Modes de publication : page formateur ------------------------------------------
+
+
+def test_publier_selon_le_mode(page, serveur_local):
+    ouvrir_formateur(page, serveur_local, TICKETS[:7])
+    publier, aide = page.locator("#btn-publier"), page.locator("#aide-publier")
+
+    sync_api.expect(page.locator("input[value=fixe]")).to_be_checked()
+    sync_api.expect(publier).to_be_disabled()  # 7 tickets : pas une série fixe
+    sync_api.expect(aide).to_have_text("Une série fixe demande exactement 5 tickets validés (actuellement 7).")
+
+    page.check("input[value=tirage]")
+    sync_api.expect(publier).to_be_enabled()
+    sync_api.expect(aide).to_have_text("")
+    sync_api.expect(page.locator(".f-modes")).to_contain_text("l'apprenant en reçoit 5, tirés au hasard")
+
+    publier.click()
+    sync_api.expect(page.locator("#serie-etat")).to_contain_text("Tirage dans la sélection, 7 tickets, publiée le")
+    sync_api.expect(page.locator("#serie-etat")).to_contain_text("l'apprenant en reçoit 5, tirés au hasard")
+    serie = page.request.get(f"{serveur_local}/api/serie").json()
+    assert serie["mode"] == "tirage" and [t["id"] for t in serie["tickets"]] == [t["id"] for t in TICKETS[:7]]
+    # En tirage, l'ordre ne compte pas : les tickets de l'encart ne sont pas numérotés.
+    assert page.locator("#serie-tickets .titre").all_inner_texts() == [t["theme"] for t in TICKETS[:7]]
+
+    # Moins de 5 tickets : aucun des deux modes ne permet de publier.
+    for _ in range(3):
+        page.locator("#liste-valides li").first.get_by_role("button", name="Retirer").click()
+    sync_api.expect(publier).to_be_disabled()
+    sync_api.expect(aide).to_have_text("Un tirage dans la sélection demande de 5 à 200 tickets validés (actuellement 4).")
+    page.check("input[value=fixe]")
+    sync_api.expect(publier).to_be_disabled()
+
+
+def categorie_principale(t):
+    c = t["attendu"]["categorie"]
+    return c[0] if isinstance(c, list) else c
+
+
+def tickets_de(*categories):
+    """Un ticket différent par catégorie demandée (2e occurrence si la catégorie est répétée…)."""
+    choisis = []
+    for c in categories:
+        choisis.append(next(t for t in TICKETS if categorie_principale(t) == c and t not in choisis))
+    return choisis
+
+
+@pytest.mark.parametrize(
+    "categories, debut",
+    [
+        (("Sécurité", "Sécurité"), "securite"),
+        (("Réseau", "Sécurité", "Réseau"), "reseau-securite"),
+        (("Matériel", "Réseau", "Logiciel", "Impression"), "plusieurs-categories"),
+    ],
+)
+def test_nom_d_export_propose(page, serveur_local, tmp_path, categories, debut):
+    tickets = tickets_de(*categories)
+    ouvrir_formateur(page, serveur_local, tickets, accepter_dialogues=False)
+    proposes = []
+    page.once("dialog", lambda d: (proposes.append(d.default_value), d.accept()))
+    with page.expect_download() as telechargement:
+        page.click("#btn-exporter")
+    attendu = f"{debut}-{time.strftime('%Y-%m-%d')}"
+    assert proposes == [attendu]
+    assert telechargement.value.suggested_filename == attendu + ".json"
+    exporte = json.loads(open(telechargement.value.path(), encoding="utf-8").read())
+    assert [t["id"] for t in exporte] == [t["id"] for t in tickets]
+
+
+@pytest.mark.parametrize(
+    "saisie, fichier",
+    [
+        ("seance-1", "seance-1.json"),
+        ("seance-1.json", "seance-1.json"),
+        ("Séance 1 : réseau/sécurité ?", "Séance 1 - réseau-sécurité -.json"),
+        ("   ", None),  # vide : le nom proposé est utilisé
+    ],
+)
+def test_nom_d_export_saisi(page, serveur_local, saisie, fichier):
+    ouvrir_formateur(page, serveur_local, tickets_de("Sécurité"), accepter_dialogues=False)
+    page.once("dialog", lambda d: d.accept(saisie))
+    with page.expect_download() as telechargement:
+        page.click("#btn-exporter")
+    assert telechargement.value.suggested_filename == (fichier or f"securite-{time.strftime('%Y-%m-%d')}.json")
+
+
+def test_export_annule(page, serveur_local):
+    ouvrir_formateur(page, serveur_local, tickets_de("Sécurité"), accepter_dialogues=False)
+    telechargements = []
+    page.on("download", lambda d: telechargements.append(d))
+    page.once("dialog", lambda d: d.dismiss())
+    page.click("#btn-exporter")
+    page.wait_for_timeout(500)
+    assert telechargements == []

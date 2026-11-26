@@ -67,13 +67,20 @@ Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette
 - **Liste des tickets validés** : elle est gardée dans la mémoire du navigateur (`localStorage`) et survit donc à un rechargement de la page. Chaque ticket peut être retiré ; « Vider la liste » efface tout, après confirmation.
   - La liste est propre à ce navigateur et à l'adresse ouverte, ce que rappelle une mention discrète dans l'en-tête, avec une infobulle. Comme le navigateur sépare les données par adresse, `http://localhost:8000` et `http://127.0.0.1:8000` ont deux listes distinctes.
   - Pour passer de l'une à l'autre, ou d'un poste à un autre, utilisez « Exporter » puis « Importer ».
-- **Exporter** télécharge `tickets-valides-AAAA-MM-JJ.json`, un tableau de tickets au format de `js/tickets.js`.
+- **Exporter** télécharge un tableau de tickets au format de `js/tickets.js`.
+  - Le nom du fichier est demandé avant l'enregistrement. Il est pré-rempli avec la catégorie principale des tickets (3 catégories au plus, sinon « plusieurs-categories ») et la date du jour, par exemple `securite-2026-11-26`. Cela facilite le rangement des fichiers.
+  - Les caractères interdits dans un nom de fichier sont remplacés, et l'extension `.json` est ajoutée une seule fois.
+  - Annuler la saisie annule l'export.
 - **Importer** ouvre un fichier `.json` de ce format, par exemple un export précédent. Le serveur valide chaque ticket avec le validateur strict de `js/tickets.js`.
   - Les tickets valides s'ajoutent à la liste, sans doublon : un identifiant déjà présent, ou répété dans le fichier, n'est ajouté qu'une fois.
   - Un compte rendu indique les tickets importés, les doublons ignorés (avec leur identifiant) et les tickets refusés (avec le ticket, le champ et le motif, par exemple « source : valeur non autorisée »).
   - Un ticket importé se retire, se publie et s'exporte comme les autres.
-- **Publier la série** n'est actif qu'avec exactement 5 tickets validés (`ticketsParSession` de `js/config.js`). Après confirmation, ces tickets deviennent la série que résolvent les apprenants, dans l'ordre de la liste. La confirmation rappelle que la série en cours sera remplacée.
-- **Série active** : l'encart du bas indique s'il y a une série publiée, avec sa date de publication et les thèmes des 5 tickets. « Retirer la série » ramène les apprenants au tirage au hasard. « Ouvrir le mode apprenant » ouvre le site dans un nouvel onglet.
+- **Publier la série** : choisissez d'abord le mode, avec les boutons radio au-dessus de la liste (N = `ticketsParSession` de `js/config.js`, soit 5).
+  - **Série fixe** : exactement N tickets. Tous les apprenants reçoivent les mêmes, dans l'ordre de la liste.
+  - **Tirage dans la sélection** : de N à 200 tickets. À chaque session, l'apprenant en reçoit N, tirés au hasard dans la liste, dans un ordre aléatoire.
+
+  Le bouton ne s'active que si le nombre de tickets convient au mode choisi ; sinon, une ligne indique ce qui manque. La confirmation rappelle le mode et précise que la série en cours sera remplacée.
+- **Série active** : l'encart du bas indique s'il y a une série publiée, avec son mode, son nombre de tickets, sa date de publication et les thèmes. Les tickets ne sont numérotés que pour une série fixe. « Retirer la série » ramène les apprenants au tirage au hasard. « Ouvrir le mode apprenant » ouvre le site dans un nouvel onglet.
 
 **Ajouter les tickets exportés au site.** Ouvrez le fichier JSON et copiez les blocs `{ ... }` (sans les crochets `[ ]` qui les entourent). Collez-les à la fin de la liste de `js/tickets.js`, avant le `];` final, en séparant chaque bloc du précédent par une virgule. Au démarrage suivant, le serveur relit `js/tickets.js` de façon stricte et signale toute erreur ; le site, lui, ignore un ticket invalide et le signale dans la console (F12).
 
@@ -197,21 +204,28 @@ Les doublons ne sont pas écartés ici : seule la page formateur connaît la lis
 
 ### Série publiée pour les apprenants : `/api/serie`
 
-Le formateur publie une série de tickets que les apprenants résolvent à la place du tirage au hasard. La série active est enregistrée dans `serveur/donnees/serie-active.json`. C'est une donnée d'exécution, ignorée par Git.
+Le formateur publie une série de tickets que les apprenants résolvent à la place du tirage au hasard habituel. Il y a deux modes (N = `ticketsParSession`, soit 5) :
+- `fixe` : exactement N tickets, les mêmes pour tous, dans l'ordre publié ;
+- `tirage` : de N à 200 tickets ; à chaque session, le site apprenant en tire N au hasard.
+
+C'est le site apprenant qui fait le tirage : le serveur ne garde aucun état par apprenant. La série active est enregistrée dans `serveur/donnees/serie-active.json`. C'est une donnée d'exécution, ignorée par Git.
 
 | Requête | Effet | Réponses |
 |---|---|---|
-| `GET /api/serie` | Série active : `{ "publiee_le": "2026-11-26T09:35:00+01:00", "tickets": [ … ] }` | 200 ; 404 s'il n'y en a pas ; 500 si le fichier est devenu invalide (modifié à la main, ou `js/config.js` changé depuis la publication) |
-| `POST /api/serie` | Publie `{ "tickets": [ … ] }` ; elle remplace la série précédente | 201 ; 422 si le nombre de tickets est faux ou si un ticket est invalide (le message cite le ticket et le champ) |
+| `GET /api/serie` | Série active : `{ "mode": "fixe", "publiee_le": "2026-11-26T09:35:00+01:00", "tickets": [ … ] }` | 200 ; 404 s'il n'y en a pas ; 500 si le fichier est devenu invalide (modifié à la main, ou `js/config.js` changé depuis la publication) |
+| `POST /api/serie` | Publie `{ "mode": "fixe" ou "tirage", "tickets": [ … ] }` (sans `mode` : `fixe`) ; elle remplace la série précédente | 201 ; 422 si le mode est inconnu, si le nombre de tickets ne convient pas au mode ou si un ticket est invalide (le message cite le ticket et le champ) |
 | `DELETE /api/serie` | Retire la série active | 204 ; 404 s'il n'y en avait pas |
 
-- Une série contient exactement `ticketsParSession` tickets, la valeur lue dans `js/config.js` (5).
+- Nombre de tickets : exactement N en mode `fixe`, de N à 200 en mode `tirage` (N lu dans `js/config.js`). Les identifiants doivent être tous différents, si bien qu'un tirage ne donne jamais deux fois le même ticket.
+- Un fichier à l'ancien format, sans `mode`, est lu comme une série `fixe`.
 - Chaque ticket est revalidé avec le même validateur strict que `js/tickets.js`, à la publication comme à chaque lecture.
 - Le fichier est écrit de façon atomique (fichier temporaire, puis renommage) : un apprenant ne peut jamais lire une série à moitié écrite, et une publication refusée laisse la série précédente intacte.
 
 **Côté site apprenant** (`js/app.js`) :
 - **Quand la page est servie par ce serveur** (`127.0.0.1` ou `localhost`), elle demande la série au chargement et au début de chaque session, avec un délai de 2 s au plus.
-  - Si elle reçoit une série valide, l'accueil affiche discrètement « Série préparée par votre formateur », et la session utilise exactement ces tickets, dans l'ordre du formateur. L'ordre des réponses reste mélangé.
+  - Série `fixe` valide : l'accueil affiche discrètement « Série préparée par votre formateur », et la session utilise exactement ces tickets, dans l'ordre du formateur.
+  - Série `tirage` valide : l'accueil affiche « Tickets choisis par votre formateur », et chaque session (y compris « Nouvelle session ») reçoit N tickets distincts, tirés au hasard dans la sélection, dans un ordre aléatoire.
+  - Dans les deux cas, l'ordre des réponses reste mélangé.
   - Dans tous les autres cas (404, erreur, délai dépassé, réponse invalide), c'est le tirage au hasard habituel, sans message visible.
 - **Sur GitHub Pages ou en ouvrant `index.html` directement**, la page ne fait aucune requête : le comportement est exactement celui d'avant.
 - Le rapport final est le même dans les deux cas.
@@ -370,12 +384,15 @@ python -m pytest serveur\tests
 Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis, l'API des séries et la validation des fichiers importés.
 
 `test_navigateur.py` teste le site apprenant dans un vrai navigateur, avec Playwright et l'Edge ou le Chrome déjà installé (aucun téléchargement de navigateur) :
-- avec une série valide, la session utilise les tickets dans l'ordre jusqu'au rapport ;
-- avec une API absente, un délai dépassé ou une réponse invalide, la session revient au tirage habituel ;
+- avec une série fixe (ancien format ou mode explicite), la session utilise les tickets dans l'ordre jusqu'au rapport ;
+- avec un tirage dans une sélection de 12 tickets, chacune des 3 sessions reçoit 5 tickets distincts de la sélection, et les tirages diffèrent ;
+- avec une API absente, un délai dépassé ou une réponse invalide (y compris un nombre de tickets qui ne convient pas au mode, un identifiant en double ou un mode inconnu), la session revient au tirage habituel ;
 - sur un nom d'hôte non local, ou avec la page ouverte comme fichier, aucune requête n'est faite.
 
 Ce même fichier teste aussi la page formateur sur le vrai serveur, lancé dans le test, sans Ollama :
 - import avec doublons et ticket refusé, retrait d'un ticket importé puis publication de la série ;
+- activation de « Publier » selon le mode, puis publication en mode tirage ;
+- nom de fichier d'export : nom proposé selon les catégories, nom saisi nettoyé, export annulé ;
 - fichier qui n'est pas du JSON, tableau vide ;
 - infobulle de l'en-tête.
 

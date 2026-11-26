@@ -156,21 +156,43 @@
   var SERVEUR_LOCAL = /^https?:$/.test(location.protocol) &&
     (location.hostname === "127.0.0.1" || location.hostname === "localhost");
 
-  // Série valide = exactement NB_PAR_SESSION tickets, chacun valide (mêmes règles
-  // que js/tickets.js). Sinon null : la session reprend le tirage au hasard.
+  // Deux modes de publication (un fichier sans mode est une série fixe) :
+  // - « fixe » : exactement NB_PAR_SESSION tickets, utilisés tels quels, dans l'ordre ;
+  // - « tirage » : au moins NB_PAR_SESSION tickets ; chaque session en tire NB_PAR_SESSION.
+  var MESSAGES_SERIE = {
+    fixe: "Série préparée par votre formateur",
+    tirage: "Tickets choisis par votre formateur"
+  };
+
+  // Série valide : mode connu, nombre de tickets conforme au mode, identifiants
+  // tous différents, chaque ticket valide (mêmes règles que js/tickets.js).
+  // Sinon null : la session reprend le tirage au hasard habituel.
   function serieValide(donnees) {
-    if (!donnees || !Array.isArray(donnees.tickets) || donnees.tickets.length !== NB_PAR_SESSION) return null;
-    for (var i = 0; i < donnees.tickets.length; i++) {
+    if (!donnees || !Array.isArray(donnees.tickets)) return null;
+    var mode = donnees.mode === undefined ? "fixe" : donnees.mode;
+    var n = donnees.tickets.length;
+    if (mode === "fixe" ? n !== NB_PAR_SESSION : mode !== "tirage" || n < NB_PAR_SESSION) return null;
+    var ids = {};
+    for (var i = 0; i < n; i++) {
       var p = problemesTicket(donnees.tickets[i]);
+      if (!p.length && ids[donnees.tickets[i].id]) p.push("identifiant en double");
       if (p.length) {
         console.warn("Série du formateur ignorée (ticket " + (i + 1) + ") : " + p.join(" ; "));
         return null;
       }
+      ids[donnees.tickets[i].id] = true;
     }
-    return donnees.tickets;
+    return { mode: mode, tickets: donnees.tickets };
   }
 
-  // Promesse : les tickets de la série, ou null (pas de série, erreur réseau,
+  // Tickets d'une session à partir d'une série valide : tels quels pour « fixe » ;
+  // pour « tirage », NB_PAR_SESSION tickets distincts tirés au hasard, dans un
+  // ordre aléatoire (les premiers d'un mélange de Fisher-Yates).
+  function ticketsDeLaSerie(serie) {
+    return serie.mode === "tirage" ? melanger(serie.tickets).slice(0, NB_PAR_SESSION) : serie.tickets;
+  }
+
+  // Promesse : la série { mode, tickets }, ou null (pas de série, erreur réseau,
   // délai de 2 s dépassé, réponse invalide). Jamais de message visible.
   function chargerSerie() {
     if (!SERVEUR_LOCAL || typeof fetch !== "function" || typeof AbortController !== "function") {
@@ -263,7 +285,12 @@
     $("nom").focus();
 
     // Mention discrète si le formateur a publié une série (serveur local uniquement).
-    if (SERVEUR_LOCAL) chargerSerie().then(function (serie) { $("info-serie").hidden = !serie; });
+    if (SERVEUR_LOCAL) {
+      chargerSerie().then(function (serie) {
+        if (serie) $("info-serie").textContent = MESSAGES_SERIE[serie.mode];
+        $("info-serie").hidden = !serie;
+      });
+    }
   }
 
   $("form-nom").addEventListener("submit", function (e) {
@@ -289,11 +316,11 @@
 
   /* ======================= Session ======================= */
 
-  // serie : tickets publiés par le formateur, utilisés tels quels et dans son
-  // ordre ; null : tirage au hasard dans la réserve, comme d'habitude.
-  // Dans les deux cas, l'ordre des réponses est mélangé ci-dessous.
+  // serie : série publiée par le formateur ({ mode, tickets }, voir ticketsDeLaSerie) ;
+  // null : tirage au hasard dans la réserve, comme d'habitude.
+  // Dans tous les cas, l'ordre des réponses est mélangé ci-dessous.
   function demarrerSession(serie) {
-    var tirage = serie || melanger(reserve).slice(0, Math.min(NB_PAR_SESSION, reserve.length));
+    var tirage = serie ? ticketsDeLaSerie(serie) : melanger(reserve).slice(0, Math.min(NB_PAR_SESSION, reserve.length));
     var annee = new Date().getFullYear();
     etat.session = tirage.map(function (t) {
       return {

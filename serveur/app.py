@@ -371,6 +371,9 @@ async def valider_fichier_tickets(request: Request) -> dict:
 class PublicationSerie(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # « fixe » ou « tirage » ; validé par serie.valider_serie (message en français).
+    # Absent : « fixe », comme avant l'ajout des modes.
+    mode: str = series.MODE_PAR_DEFAUT
     # Chaque ticket est validé ensuite par le validateur strict de js/tickets.js,
     # qui donne des messages précis (numéro du ticket, champ en cause).
     tickets: list[Any]
@@ -397,10 +400,13 @@ def publier_serie(publication: PublicationSerie) -> dict:
     """Publie une série ; elle remplace la précédente."""
     try:
         with VERROU_SERIE:
-            serie = series.publier_serie(publication.tickets, CATEGORIES, TICKETS_PAR_SESSION, CHEMIN_SERIE)
+            serie = series.publier_serie(
+                publication.mode, publication.tickets, CATEGORIES, TICKETS_PAR_SESSION, CHEMIN_SERIE
+            )
     except series.ErreurSerie as erreur:
         raise HTTPException(status_code=422, detail=f"Série refusée : {erreur}") from None
-    log.info("Série publiée : %s", ", ".join(t.get("id", "?") for t in serie["tickets"]))
+    log.info("Série publiée (%s, %d tickets) : %s", serie["mode"], len(serie["tickets"]),
+             ", ".join(t.get("id", "?") for t in serie["tickets"]))
     return serie
 
 

@@ -117,7 +117,22 @@ h3.f-titre { font-size: .8rem; margin: 6px 0 0; text-transform: uppercase; lette
 .f-note-stockage { font-size: .82rem; color: var(--ko); margin: 8px 0 0; }
 .btn.petit { padding: 6px 12px; font-size: .8rem; flex: none; }
 a.btn { display: inline-block; text-decoration: none; color: var(--texte); }
-.f-aide-publier { margin: -8px 0 12px; }
+.f-aide-publier { margin: 0 0 12px; }
+
+/* ---------- Choix du mode de publication ---------- */
+.f-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border: none; padding: 0; margin: -6px 0 10px; }
+.f-modes legend {
+  font-size: .75rem; font-weight: 800; color: var(--discret); text-transform: uppercase; letter-spacing: .5px;
+  padding: 0; margin-bottom: 8px;
+}
+.f-mode {
+  display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  padding: 10px 14px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--champ-bord);
+}
+.f-mode:has(input:checked) { border-color: var(--accent); }
+.f-mode input { width: auto; margin-top: 4px; accent-color: var(--interactif); }
+.f-mode small { display: block; color: var(--discret); font-size: .84rem; line-height: 1.4; margin-top: 2px; }
+@media (max-width: 860px) { .f-modes { grid-template-columns: 1fr; } }
 
 /* ---------- Mention « liste enregistrée dans ce navigateur » + infobulle ---------- */
 .barre { z-index: 5; } /* l'infobulle passe au-dessus des cartes */

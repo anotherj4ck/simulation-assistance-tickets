@@ -31,6 +31,9 @@
   var CLE_STOCKAGE = "formateur.ticketsValides";
   // Une série publiée compte autant de tickets qu'une session du site (js/config.js).
   var NB_SERIE = (window.CONFIG && window.CONFIG.ticketsParSession) || 5;
+  // Plafond du mode « tirage » : même valeur que MAX_TICKETS_TIRAGE dans serveur/serie.py.
+  var MAX_TIRAGE = 200;
+  var LIBELLES_MODE = { fixe: "Série fixe", tirage: "Tirage dans la sélection" };
 
   var $ = function (id) { return document.getElementById(id); };
   var courant = null;   // réponse de l'API pour le ticket affiché (null : aucun)
@@ -408,9 +411,7 @@
     $("nb-valides").textContent = valides.length;
     $("liste-vide").hidden = valides.length > 0;
     $("btn-exporter").disabled = $("btn-vider").disabled = valides.length === 0;
-    $("btn-publier").disabled = valides.length !== NB_SERIE;
-    $("aide-publier").textContent = valides.length === NB_SERIE ? ""
-      : "« Publier la série » demande exactement " + NB_SERIE + " tickets validés (actuellement " + valides.length + ").";
+    majPublier();
 
     valides.forEach(function (t, i) {
       var li = element("li");
@@ -435,12 +436,48 @@
     });
   }
 
+  function slug(texte) {
+    return String(texte).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+
+  // Date locale du jour (et non UTC : un export à 23 h 30 garde la date du jour).
+  function dateDuJour() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // Nom proposé : la catégorie principale de chaque ticket (3 au plus, sinon
+  // « plusieurs-categories »), puis la date. Ex. : « securite-2026-11-26 ».
+  function nomExportPropose(tickets) {
+    var categories = [];
+    tickets.forEach(function (t) {
+      var principale = slug(enListe((t.attendu || {}).categorie || [])[0] || "");
+      if (principale && categories.indexOf(principale) === -1) categories.push(principale);
+    });
+    var debut = !categories.length ? "tickets" : categories.length <= 3 ? categories.join("-") : "plusieurs-categories";
+    return debut + "-" + dateDuJour();
+  }
+
+  // Nom saisi : caractères interdits dans un nom de fichier remplacés, une seule
+  // extension .json. Vide : chaîne vide (le nom proposé est alors utilisé).
+  function nomFichierPropre(saisie) {
+    var nom = String(saisie).trim()
+      .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "-")
+      .replace(/\.json$/i, "")
+      .replace(/^[.\s-]+|[.\s]+$/g, "");
+    return nom ? nom + ".json" : "";
+  }
+
   $("btn-exporter").addEventListener("click", function () {
+    var propose = nomExportPropose(valides);
+    var saisie = window.prompt("Nom du fichier à enregistrer (l'extension .json est ajoutée) :", propose);
+    if (saisie === null) return; // export annulé
     var blob = new Blob([JSON.stringify(valides, null, 2) + "\n"], { type: "application/json" });
     var url = URL.createObjectURL(blob);
     var lien = document.createElement("a");
     lien.href = url;
-    lien.download = "tickets-valides-" + new Date().toISOString().slice(0, 10) + ".json";
+    lien.download = nomFichierPropre(saisie) || propose + ".json";
     document.body.appendChild(lien);
     lien.click();
     lien.remove();
@@ -557,12 +594,16 @@
       $("serie-etat").textContent = "Aucune série publiée : les apprenants ont le tirage au hasard habituel.";
       return;
     }
-    $("serie-etat").textContent = "Publiée le " + dateLisible(serie.publiee_le) +
-      ". Les apprenants qui ouvrent le site sur ce serveur reçoivent ces " + serie.tickets.length + " tickets, dans cet ordre.";
+    var mode = serie.mode || "fixe";
+    $("serie-etat").textContent = LIBELLES_MODE[mode] + ", " + serie.tickets.length + " tickets, publiée le " +
+      dateLisible(serie.publiee_le) + ". " + (mode === "tirage"
+        ? "À chaque session, l'apprenant en reçoit " + NB_SERIE + ", tirés au hasard, dans un ordre aléatoire."
+        : "Tous les apprenants reçoivent ces " + serie.tickets.length + " tickets, dans cet ordre.");
     serie.tickets.forEach(function (t, i) {
       var li = element("li");
       var corps = element("div");
-      corps.appendChild(element("div", "titre", (i + 1) + ". " + (t.theme || t.id)));
+      // Numéros seulement pour une série fixe : en tirage, l'ordre de la liste ne compte pas.
+      corps.appendChild(element("div", "titre", (mode === "fixe" ? (i + 1) + ". " : "") + (t.theme || t.id)));
       corps.appendChild(element("div", "detail",
         [t.nom + (t.service ? ", " + t.service : ""), t.source, enListe(t.attendu.categorie).join(" / "), t.id].join(" · ")));
       li.appendChild(corps);
@@ -594,8 +635,36 @@
       });
   }
 
+  function modeChoisi() {
+    return document.querySelector('input[name="mode-serie"]:checked').value;
+  }
+
+  // « Publier » s'active selon le mode : exactement NB_SERIE tickets pour une
+  // série fixe ; de NB_SERIE à MAX_TIRAGE pour un tirage dans la sélection.
+  function publicationPossible() {
+    var n = valides.length;
+    return modeChoisi() === "fixe" ? n === NB_SERIE : n >= NB_SERIE && n <= MAX_TIRAGE;
+  }
+
+  function majPublier() {
+    var n = valides.length;
+    $("btn-publier").disabled = !publicationPossible();
+    $("aide-publier").textContent = publicationPossible() ? ""
+      : modeChoisi() === "fixe"
+        ? "Une série fixe demande exactement " + NB_SERIE + " tickets validés (actuellement " + n + ")."
+        : "Un tirage dans la sélection demande de " + NB_SERIE + " à " + MAX_TIRAGE + " tickets validés (actuellement " + n + ").";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="mode-serie"]'), function (radio) {
+    radio.addEventListener("change", majPublier);
+  });
+
   $("btn-publier").addEventListener("click", function () {
-    var question = "Publier ces " + valides.length + " tickets comme série pour les apprenants ?\n\n" +
+    var mode = modeChoisi();
+    var question = "Publier ces " + valides.length + " tickets pour les apprenants, en mode « " + LIBELLES_MODE[mode] + " » ?\n\n" +
+      (mode === "tirage"
+        ? "À chaque session, chaque apprenant en recevra " + NB_SERIE + ", tirés au hasard.\n"
+        : "Tous les apprenants recevront ces " + NB_SERIE + " tickets, dans l'ordre de la liste.\n") +
       (serieActive
         ? "Elle remplacera la série en cours, publiée le " + dateLisible(serieActive.publiee_le) + "."
         : "Elle remplacera la série en cours s'il y en a une (aucune pour l'instant).");
@@ -606,7 +675,7 @@
     fetch("api/serie", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickets: valides })
+      body: JSON.stringify({ mode: mode, tickets: valides })
     })
       .then(lireReponse)
       .then(function (res) {
@@ -618,7 +687,7 @@
         }
       })
       .catch(function () { erreurSerie("Le serveur local ne répond pas : la série n'a pas été publiée."); })
-      .then(function () { bouton.disabled = valides.length !== NB_SERIE; });
+      .then(majPublier);
   });
 
   $("btn-retirer-serie").addEventListener("click", function () {
@@ -634,6 +703,9 @@
   /* ======================= Démarrage ======================= */
 
   majBoutonTheme();
+  // Explications des modes : nombres issus de js/config.js et du plafond du tirage.
+  Array.prototype.forEach.call(document.querySelectorAll(".nb-session"), function (el) { el.textContent = NB_SERIE; });
+  Array.prototype.forEach.call(document.querySelectorAll(".max-tirage"), function (el) { el.textContent = MAX_TIRAGE; });
   remplirSelect($("g-categorie"), CATEGORIES.map(function (c) { return { valeur: c, libelle: c }; }));
   remplirSelect($("g-source"), [{ valeur: "", libelle: "Au hasard" }].concat(
     SOURCES.map(function (s) { return { valeur: s, libelle: s }; })));

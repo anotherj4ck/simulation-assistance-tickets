@@ -127,6 +127,19 @@
           <button class="btn secondaire" id="btn-vider" type="button" disabled>Vider la liste</button>
         </div>
       </div>
+      <fieldset class="f-modes">
+        <legend>Mode de publication</legend>
+        <label class="f-mode">
+          <input type="radio" name="mode-serie" value="fixe" checked>
+          <span><b>Série fixe</b>
+            <small>Exactement <span class="nb-session">5</span> tickets. Tous les apprenants reçoivent les mêmes, dans l'ordre de la liste.</small></span>
+        </label>
+        <label class="f-mode">
+          <input type="radio" name="mode-serie" value="tirage">
+          <span><b>Tirage dans la sélection</b>
+            <small>Au moins <span class="nb-session">5</span> tickets (<span class="max-tirage">200</span> au plus). À chaque session, l'apprenant en reçoit <span class="nb-session">5</span>, tirés au hasard dans la liste, dans un ordre aléatoire.</small></span>
+        </label>
+      </fieldset>
       <p class="f-infos f-aide-publier" id="aide-publier"></p>
       <div class="f-import" id="resultat-import" role="status" hidden></div>
       <p class="f-vide" id="liste-vide">Aucun ticket validé pour l'instant.</p>

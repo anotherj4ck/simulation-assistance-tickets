@@ -101,3 +101,83 @@ def test_ecriture_refusee_depuis_une_autre_page_web(client):
     # Depuis une page de ce serveur : accepté.
     entetes["Origin"] = "http://127.0.0.1"
     assert client.post("/api/serie", content=corps, headers=entetes).status_code == 201
+
+
+# --- Modes « fixe » et « tirage » -------------------------------------------------
+
+
+def selection(nombre):
+    """`nombre` tickets valides et d'identifiants distincts (au-delà des 30 du site, copies renommées)."""
+    tickets = []
+    for i in range(nombre):
+        t = copy.deepcopy(TICKETS[i % len(TICKETS)])
+        if i >= len(TICKETS):
+            t["id"] = f"{t['id']}-copie-{i}"
+        tickets.append(t)
+    return tickets
+
+
+def test_mode_fixe_explicite(client):
+    reponse = client.post("/api/serie", json={"mode": "fixe", "tickets": SERIE})
+    assert reponse.status_code == 201
+    lue = client.get("/api/serie").json()
+    assert lue["mode"] == "fixe" and [t["id"] for t in lue["tickets"]] == [t["id"] for t in SERIE]
+
+
+def test_mode_absent_vaut_fixe(client):
+    client.post("/api/serie", json={"tickets": SERIE})
+    assert client.get("/api/serie").json()["mode"] == "fixe"
+
+
+@pytest.mark.parametrize("nombre", [5, 12, 200])
+def test_mode_tirage_accepte_de_5_a_200(client, nombre):
+    tickets = selection(nombre)
+    reponse = client.post("/api/serie", json={"mode": "tirage", "tickets": tickets})
+    assert reponse.status_code == 201
+    lue = client.get("/api/serie").json()
+    assert lue["mode"] == "tirage" and len(lue["tickets"]) == nombre
+
+
+@pytest.mark.parametrize(
+    "mode, nombre, message",
+    [
+        ("fixe", 4, "une série fixe contient exactement 5 tickets"),
+        ("fixe", 12, "une série fixe contient exactement 5 tickets"),
+        ("tirage", 4, "au moins 5 tickets"),
+        ("tirage", 201, "200 au plus"),
+    ],
+)
+def test_nombre_de_tickets_invalide_selon_le_mode(client, mode, nombre, message):
+    reponse = client.post("/api/serie", json={"mode": mode, "tickets": selection(nombre)})
+    assert reponse.status_code == 422
+    assert message in reponse.json()["detail"]
+    assert client.get("/api/serie").status_code == 404
+
+
+def test_mode_inconnu_refuse(client):
+    reponse = client.post("/api/serie", json={"mode": "aleatoire", "tickets": SERIE})
+    assert reponse.status_code == 422
+    assert "mode inconnu : « aleatoire »" in reponse.json()["detail"]
+
+
+def test_tirage_refuse_les_identifiants_en_double(client):
+    tickets = selection(6)
+    tickets[5] = copy.deepcopy(tickets[0])
+    reponse = client.post("/api/serie", json={"mode": "tirage", "tickets": tickets})
+    assert reponse.status_code == 422
+    assert "identifiant en double" in reponse.json()["detail"]
+
+
+def test_ancien_format_sans_mode_lu_comme_fixe(client):
+    ancien = {"publiee_le": "2026-11-26T09:35:00+01:00", "tickets": SERIE}
+    application.CHEMIN_SERIE.write_text(json.dumps(ancien, ensure_ascii=False), encoding="utf-8")
+    lue = client.get("/api/serie").json()
+    assert lue == {"mode": "fixe", **ancien}
+
+
+def test_ancien_format_avec_plus_de_5_tickets_signale(client):
+    ancien = {"publiee_le": "2026-11-26T09:35:00+01:00", "tickets": selection(8)}
+    application.CHEMIN_SERIE.write_text(json.dumps(ancien), encoding="utf-8")
+    reponse = client.get("/api/serie")
+    assert reponse.status_code == 500
+    assert "série fixe" in reponse.json()["detail"]
