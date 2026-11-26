@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import random
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -172,19 +173,66 @@ def en_liste(valeur: str | list[str]) -> list[str]:
     return valeur if isinstance(valeur, list) else [valeur]
 
 
+def _message_fr(erreur: dict) -> str:
+    """Message Pydantic traduit pour le formateur (les plus courants)."""
+    type_ = erreur["type"]
+    contexte = erreur.get("ctx") or {}
+    if type_ == "missing":
+        return "champ obligatoire manquant"
+    if type_ == "extra_forbidden":
+        return "champ inconnu (faute de frappe ?)"
+    if type_ == "literal_error":
+        attendu = str(contexte.get("expected", "?")).replace(" or ", " ou ")
+        return f"valeur non autorisée (attendu : {attendu})"
+    if type_ == "string_too_short":
+        return "texte vide"
+    if type_ == "too_short":
+        return f"au moins {contexte.get('min_length', '?')} élément(s) attendu(s)"
+    if type_ in ("model_type", "model_attributes_type"):
+        return "ce n'est pas un ticket { … }"
+    if type_ in ("string_type", "bool_type", "list_type"):
+        attendu = {"string_type": "un texte", "bool_type": "true ou false", "list_type": "une liste [ … ]"}[type_]
+        return f"type incorrect (attendu : {attendu})"
+    if type_ == "value_error":
+        return str(contexte.get("error", erreur["msg"]))
+    return erreur["msg"]
+
+
+@dataclass(frozen=True)
+class ExamenTicket:
+    """Résultat de la validation d'un ticket : `ticket` est None s'il est invalide."""
+
+    position: int
+    id: str
+    ticket: TicketSite | None
+    problemes: tuple[str, ...]  # « champ : message », vide si le ticket est valide
+
+
+def examiner_tickets(bruts: list, categories: tuple[str, ...]) -> list[ExamenTicket]:
+    """Valide chaque ticket séparément avec le validateur strict de js/tickets.js."""
+    examens = []
+    for n, brut in enumerate(bruts, 1):
+        nom = str(brut.get("id") or "sans id") if isinstance(brut, dict) else "?"
+        try:
+            ticket = TicketSite.model_validate(brut, context={"categories": categories})
+            examens.append(ExamenTicket(n, nom, ticket, ()))
+        except ValidationError as e:
+            problemes = tuple(
+                f"{'.'.join(str(x) for x in err['loc']) or 'ticket'} : {_message_fr(err)}" for err in e.errors()
+            )
+            examens.append(ExamenTicket(n, nom, None, problemes))
+    return examens
+
+
 def valider_tickets(bruts: list, categories: tuple[str, ...]) -> tuple[list[TicketSite], list[str]]:
     """Validation stricte, commune à js/tickets.js et aux séries publiées par le
     formateur. Renvoie (tickets valides, problèmes) ; aucun problème = tout est valide."""
     problemes: list[str] = []
     tickets: list[TicketSite] = []
-    for n, brut in enumerate(bruts, 1):
-        nom = brut.get("id", "sans id") if isinstance(brut, dict) else "?"
-        try:
-            tickets.append(TicketSite.model_validate(brut, context={"categories": categories}))
-        except ValidationError as e:
-            for err in e.errors():
-                lieu = ".".join(str(x) for x in err["loc"]) or "ticket"
-                problemes.append(f"ticket n° {n} ({nom}) : {lieu} : {err['msg']}")
+    for examen in examiner_tickets(bruts, categories):
+        if examen.ticket is not None:
+            tickets.append(examen.ticket)
+        problemes += [f"ticket n° {examen.position} ({examen.id}) : {p}" for p in examen.problemes]
     ids = [t.id for t in tickets]
     problemes += [f"identifiant en double : {i}" for i in sorted({i for i in ids if ids.count(i) > 1})]
     return tickets, problemes

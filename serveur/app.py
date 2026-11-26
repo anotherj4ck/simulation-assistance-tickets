@@ -8,6 +8,7 @@ Lancement, depuis la racine du dépôt (voir serveur/README.md) :
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -36,7 +37,7 @@ from .configuration import (
     lire_reglages,
     lire_tickets_par_session,
 )
-from .exemples import lire_exemples
+from .exemples import examiner_tickets, lire_exemples
 from . import serie as series
 from .generateur import (
     TicketRejete,
@@ -317,6 +318,51 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             f"Dernier motif de rejet : {' ; '.join(motifs)}."
         ),
     )
+
+
+# --- Import d'un fichier de tickets (page formateur) ----------------------------
+
+# Un export de 100 tickets pèse environ 150 Ko : 2 Mo laisse une large marge.
+TAILLE_MAX_IMPORT = 2 * 1024 * 1024
+
+
+@app.post("/api/valider-tickets")
+async def valider_fichier_tickets(request: Request) -> dict:
+    """Valide le contenu d'un fichier exporté (tableau JSON de tickets au format
+    de js/tickets.js), ticket par ticket, avec le validateur strict.
+
+    Le corps est le contenu brut du fichier : c'est le serveur qui le lit, pour
+    expliquer clairement un fichier qui n'est pas du JSON. Les doublons avec la
+    liste du formateur sont écartés par la page, qui seule connaît cette liste.
+    """
+    corps = await request.body()
+    if len(corps) > TAILLE_MAX_IMPORT:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (2 Mo au maximum).")
+    try:
+        donnees = json.loads(corps.decode("utf-8-sig"))
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="Le fichier n'est pas un texte encodé en UTF-8.") from None
+    except json.JSONDecodeError as erreur:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Le fichier n'est pas un JSON valide (ligne {erreur.lineno}, colonne {erreur.colno} : {erreur.msg}).",
+        ) from None
+    if not isinstance(donnees, list):
+        raise HTTPException(
+            status_code=422,
+            detail="Le fichier doit contenir un tableau de tickets [ … ], comme celui produit par « Exporter ».",
+        )
+    if not donnees:
+        raise HTTPException(status_code=422, detail="Le fichier ne contient aucun ticket (tableau vide).")
+
+    examens = examiner_tickets(donnees, CATEGORIES)
+    return {
+        # Tickets valides tels que reçus, dans l'ordre du fichier.
+        "valides": [donnees[e.position - 1] for e in examens if e.ticket is not None],
+        "refuses": [
+            {"position": e.position, "id": e.id, "motifs": list(e.problemes)} for e in examens if e.ticket is None
+        ],
+    }
 
 
 # --- Série publiée par le formateur --------------------------------------------

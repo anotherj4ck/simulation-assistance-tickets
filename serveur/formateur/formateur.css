@@ -119,6 +119,27 @@ h3.f-titre { font-size: .8rem; margin: 6px 0 0; text-transform: uppercase; lette
 a.btn { display: inline-block; text-decoration: none; color: var(--texte); }
 .f-aide-publier { margin: -8px 0 12px; }
 
+/* ---------- Mention « liste enregistrée dans ce navigateur » + infobulle ---------- */
+.barre { z-index: 5; } /* l'infobulle passe au-dessus des cartes */
+.f-memoire { position: relative; display: inline-block; cursor: help; border-radius: 6px; }
+.f-infobulle {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 10; width: min(420px, 80vw);
+  padding: 10px 12px; border-radius: 12px; font-size: .82rem; line-height: 1.45;
+  background: var(--champ); color: var(--texte); border: 1.5px solid var(--champ-bord); box-shadow: var(--ombre);
+  visibility: hidden; opacity: 0; transition: opacity .15s ease;
+}
+.f-memoire:hover .f-infobulle, .f-memoire:focus .f-infobulle, .f-memoire:focus-within .f-infobulle { visibility: visible; opacity: 1; }
+
+/* ---------- Compte rendu d'import ---------- */
+.f-import {
+  margin: 0 0 14px; padding: 12px 16px; border-radius: 14px;
+  background: var(--surface); border: 1.5px solid var(--champ-bord); font-size: .9rem;
+}
+.f-import[data-etat="erreur"] { border-color: var(--ko); background: var(--ko-fond); }
+.f-import p { margin: 0; }
+.f-import ul { margin: 6px 0 0; padding-left: 1.2em; }
+.f-import .refus { color: var(--ko); }
+
 @media (max-width: 860px) {
   .f-form { grid-template-columns: 1fr; }
   .f-liste li { flex-direction: column; }

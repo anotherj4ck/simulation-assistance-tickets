@@ -64,8 +64,14 @@ Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette
 
   Un avertissement apparaît si la bonne réponse devient la plus longue des quatre.
 - **Valider** ajoute le ticket à la liste du bas, s'il est complet : exactement une bonne réponse, aucun texte vide, objet présent pour un courriel, au moins une valeur cochée pour chaque critère. **Rejeter** l'abandonne.
-- **Liste des tickets validés** : elle est gardée dans la mémoire du navigateur (`localStorage`) et survit donc à un rechargement de la page. Elle est propre à ce navigateur, sur ce poste. Chaque ticket peut être retiré ; « Vider la liste » efface tout, après confirmation.
+- **Liste des tickets validés** : elle est gardée dans la mémoire du navigateur (`localStorage`) et survit donc à un rechargement de la page. Chaque ticket peut être retiré ; « Vider la liste » efface tout, après confirmation.
+  - La liste est propre à ce navigateur et à l'adresse ouverte, ce que rappelle une mention discrète dans l'en-tête, avec une infobulle. Comme le navigateur sépare les données par adresse, `http://localhost:8000` et `http://127.0.0.1:8000` ont deux listes distinctes.
+  - Pour passer de l'une à l'autre, ou d'un poste à un autre, utilisez « Exporter » puis « Importer ».
 - **Exporter** télécharge `tickets-valides-AAAA-MM-JJ.json`, un tableau de tickets au format de `js/tickets.js`.
+- **Importer** ouvre un fichier `.json` de ce format, par exemple un export précédent. Le serveur valide chaque ticket avec le validateur strict de `js/tickets.js`.
+  - Les tickets valides s'ajoutent à la liste, sans doublon : un identifiant déjà présent, ou répété dans le fichier, n'est ajouté qu'une fois.
+  - Un compte rendu indique les tickets importés, les doublons ignorés (avec leur identifiant) et les tickets refusés (avec le ticket, le champ et le motif, par exemple « source : valeur non autorisée »).
+  - Un ticket importé se retire, se publie et s'exporte comme les autres.
 - **Publier la série** n'est actif qu'avec exactement 5 tickets validés (`ticketsParSession` de `js/config.js`). Après confirmation, ces tickets deviennent la série que résolvent les apprenants, dans l'ordre de la liste. La confirmation rappelle que la série en cours sera remplacée.
 - **Série active** : l'encart du bas indique s'il y a une série publiée, avec sa date de publication et les thèmes des 5 tickets. « Retirer la série » ramène les apprenants au tirage au hasard. « Ouvrir le mode apprenant » ouvre le site dans un nouvel onglet.
 
@@ -178,6 +184,16 @@ Une génération prend de quelques secondes à quelques minutes, selon le modèl
 |---|---|
 | 422 | Corps invalide (catégorie inconnue, difficulté inconnue…), ou ticket rejeté 3 fois de suite par les contrôles de qualité. Le message donne le dernier motif de rejet. |
 | 503 | Ollama injoignable, délai dépassé (`OLLAMA_TIMEOUT`) ou modèle non installé. Le message dit quoi faire. |
+
+### `POST /api/valider-tickets`
+
+Valide le contenu d'un fichier de tickets ; c'est la route qu'utilise « Importer ». Le corps est le contenu brut du fichier, un tableau JSON au format de `js/tickets.js`, envoyé avec `Content-Type: application/json`.
+
+- **200** : `{ "valides": [ …tickets valides, tels que reçus… ], "refuses": [ { "position": 5, "id": "t04-imprimante", "motifs": ["source : valeur non autorisée (…)"] } ] }`. Chaque ticket est validé séparément : un ticket refusé n'empêche pas les autres.
+- **422** : le fichier n'est pas du JSON (la ligne et la colonne sont indiquées), n'est pas en UTF-8, n'est pas un tableau, ou est un tableau vide.
+- **413** : fichier de plus de 2 Mo.
+
+Les doublons ne sont pas écartés ici : seule la page formateur connaît la liste de tickets déjà validés.
 
 ### Série publiée pour les apprenants : `/api/serie`
 
@@ -351,12 +367,17 @@ python -m pip install -r serveur\requirements-dev.txt
 python -m pytest serveur\tests
 ```
 
-Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis et l'API des séries.
+Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis, l'API des séries et la validation des fichiers importés.
 
 `test_navigateur.py` teste le site apprenant dans un vrai navigateur, avec Playwright et l'Edge ou le Chrome déjà installé (aucun téléchargement de navigateur) :
 - avec une série valide, la session utilise les tickets dans l'ordre jusqu'au rapport ;
 - avec une API absente, un délai dépassé ou une réponse invalide, la session revient au tirage habituel ;
 - sur un nom d'hôte non local, ou avec la page ouverte comme fichier, aucune requête n'est faite.
+
+Ce même fichier teste aussi la page formateur sur le vrai serveur, lancé dans le test, sans Ollama :
+- import avec doublons et ticket refusé, retrait d'un ticket importé puis publication de la série ;
+- fichier qui n'est pas du JSON, tableau vide ;
+- infobulle de l'en-tête.
 
 Sans navigateur disponible, ces tests sont ignorés.
 

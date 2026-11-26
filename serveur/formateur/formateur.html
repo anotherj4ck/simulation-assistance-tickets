@@ -22,6 +22,15 @@
     <div>
       <div class="nom-outil">Mode formateur</div>
       <div class="info">Générer, relire, corriger et exporter des tickets · serveur local uniquement</div>
+      <div class="info f-memoire" tabindex="0" aria-describedby="infobulle-memoire">
+        Liste enregistrée dans ce navigateur, pour cette adresse <span aria-hidden="true">ⓘ</span>
+        <span class="f-infobulle" id="infobulle-memoire" role="tooltip">
+          La liste des tickets validés est gardée dans la mémoire de ce navigateur, séparément pour
+          chaque adresse : <b>http://localhost:8000</b> et <b>http://127.0.0.1:8000</b> ont chacune leur
+          propre liste, comme deux navigateurs différents. Ouvrez toujours la même adresse, ou passez de
+          l'une à l'autre avec « Exporter » puis « Importer ».
+        </span>
+      </div>
     </div>
     <div class="barre-droite">
       <span class="f-modele" id="etat-modele" data-etat="attente" aria-live="polite">Vérification d'Ollama…</span>
@@ -113,10 +122,13 @@
         <div class="boutons">
           <button class="btn principal" id="btn-publier" type="button" disabled>Publier la série</button>
           <button class="btn secondaire" id="btn-exporter" type="button" disabled>Exporter (JSON)</button>
+          <button class="btn secondaire" id="btn-importer" type="button">Importer (JSON)</button>
+          <input type="file" id="fichier-import" accept=".json,application/json" hidden>
           <button class="btn secondaire" id="btn-vider" type="button" disabled>Vider la liste</button>
         </div>
       </div>
       <p class="f-infos f-aide-publier" id="aide-publier"></p>
+      <div class="f-import" id="resultat-import" role="status" hidden></div>
       <p class="f-vide" id="liste-vide">Aucun ticket validé pour l'instant.</p>
       <ol class="f-liste" id="liste-valides"></ol>
       <p class="f-note-stockage" id="note-stockage" hidden>Mémoire du navigateur indisponible : la liste sera perdue à la fermeture de la page. Pensez à exporter.</p>

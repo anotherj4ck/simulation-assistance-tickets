@@ -447,6 +447,86 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   });
 
+  /* ---------- Import d'un fichier exporté ---------- */
+
+  function pluriel(n, mot) { return n + " " + mot + (n > 1 ? "s" : ""); }
+
+  function compteRenduImport(etat, lignes) {
+    var zone = $("resultat-import");
+    zone.textContent = "";
+    zone.dataset.etat = etat;
+    lignes.forEach(function (l) { zone.appendChild(l); });
+    zone.hidden = false;
+  }
+
+  // Ajoute les tickets valides renvoyés par le serveur, sans doublon d'identifiant
+  // (ni avec la liste existante, ni à l'intérieur du fichier).
+  function ajouterImportes(nomFichier, resultat) {
+    var connus = {};
+    valides.forEach(function (t) { connus[t.id] = true; });
+    var importes = [], doublons = [];
+    resultat.valides.forEach(function (t) {
+      if (connus[t.id]) { doublons.push(t.id); return; }
+      connus[t.id] = true;
+      importes.push(t);
+    });
+    if (importes.length) {
+      valides = valides.concat(importes);
+      enregistrerValides();
+      afficherValides();
+    }
+
+    var refuses = resultat.refuses || [];
+    var lignes = [element("p", null, "Import de « " + nomFichier + " » : " +
+      pluriel(importes.length, "ticket") + " importé" + (importes.length > 1 ? "s" : "") + ", " +
+      doublons.length + " ignoré" + (doublons.length > 1 ? "s" : "") + " (doublons), " +
+      refuses.length + " refusé" + (refuses.length > 1 ? "s" : "") + ".")];
+    if (doublons.length) {
+      lignes.push(element("p", null, "Doublons non ajoutés (identifiant déjà dans la liste ou répété dans le fichier) : " +
+        doublons.join(", ") + "."));
+    }
+    if (refuses.length) {
+      var ul = element("ul", "refus");
+      refuses.forEach(function (r) {
+        ul.appendChild(element("li", null, "Ticket n° " + r.position + " (" + r.id + ") : " + r.motifs.join(" ; ")));
+      });
+      lignes.push(element("p", "refus", "Refusés par le validateur :"));
+      lignes.push(ul);
+    }
+    compteRenduImport(refuses.length && !importes.length ? "erreur" : "ok", lignes);
+  }
+
+  $("btn-importer").addEventListener("click", function () { $("fichier-import").click(); });
+
+  $("fichier-import").addEventListener("change", function () {
+    var fichier = this.files && this.files[0];
+    this.value = ""; // permet de réimporter le même fichier
+    if (!fichier) return;
+    var bouton = $("btn-importer");
+    bouton.disabled = true;
+    fichier.text()
+      .then(function (contenu) {
+        // Le contenu brut est envoyé tel quel : le serveur le lit et le valide.
+        return fetch("api/valider-tickets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: contenu
+        });
+      })
+      .then(lireReponse)
+      .then(function (res) {
+        if (res.ok && res.d && Array.isArray(res.d.valides)) {
+          ajouterImportes(fichier.name, res.d);
+        } else {
+          compteRenduImport("erreur", [element("p", null, "Import de « " + fichier.name + " » impossible : " + messageErreur(res))]);
+        }
+      })
+      .catch(function () {
+        compteRenduImport("erreur", [element("p", null, "Import impossible : le serveur local ne répond pas.")]);
+      })
+      .then(function () { bouton.disabled = false; });
+  });
+
   $("btn-vider").addEventListener("click", function () {
     if (!window.confirm("Vider la liste des " + valides.length + " tickets validés ? Pensez à exporter avant.")) return;
     valides = [];

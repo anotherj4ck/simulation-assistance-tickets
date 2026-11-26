@@ -7,8 +7,11 @@ situation de GitHub Pages ou d'un serveur sans série publiée. Les réponses de
 Ignorés (skip) si Playwright n'est pas installé ou si aucun navigateur n'est disponible.
 """
 
+import copy
 import functools
 import json
+import os
+import socket
 import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -161,3 +164,113 @@ def test_nom_d_hote_non_local_aucune_requete(page):
         assert page.requetes_serie == []
     finally:
         serveur.shutdown()
+
+
+# --- Page formateur : import d'un fichier, sur le vrai serveur (sans Ollama) -------
+
+
+@pytest.fixture(scope="module")
+def serveur_local(tmp_path_factory):
+    """L'application FastAPI, lancée dans un thread sur un port libre. La série
+    active est écrite dans un dossier temporaire. Ollama n'est pas appelé."""
+    os.environ.setdefault("OLLAMA_MODEL", "modele-de-test")
+    import uvicorn
+
+    import serveur.app as application
+
+    chemin_avant = application.CHEMIN_SERIE
+    application.CHEMIN_SERIE = tmp_path_factory.mktemp("serie") / "serie-active.json"
+    prise = socket.socket()
+    prise.bind(("127.0.0.1", 0))
+    serveur = uvicorn.Server(uvicorn.Config(application.app, log_level="warning"))
+    fil = threading.Thread(target=serveur.run, kwargs={"sockets": [prise]}, daemon=True)
+    fil.start()
+    for _ in range(100):
+        if serveur.started:
+            break
+        time.sleep(0.05)
+    yield f"http://127.0.0.1:{prise.getsockname()[1]}"
+    serveur.should_exit = True
+    fil.join(5)
+    application.CHEMIN_SERIE = chemin_avant
+
+
+def fichier_json(tmp_path, nom, contenu):
+    chemin = tmp_path / nom
+    chemin.write_text(contenu if isinstance(contenu, str) else json.dumps(contenu, ensure_ascii=False), encoding="utf-8")
+    return str(chemin)
+
+
+def ouvrir_formateur(page, serveur_local, liste_initiale=()):
+    page.add_init_script(
+        f"localStorage.setItem('formateur.ticketsValides', {json.dumps(json.dumps(list(liste_initiale)))});"
+    )
+    page.on("dialog", lambda d: d.accept())
+    page.goto(f"{serveur_local}/formateur.html")
+    sync_api.expect(page.locator("#serie-etat")).not_to_have_text("Vérification…")
+
+
+def test_import_doublons_refus_retrait_puis_publication(page, serveur_local, tmp_path):
+    t = TICKETS
+    invalide = copy.deepcopy(t[3])
+    invalide["source"] = "Pigeon"
+    contenu = [t[0], t[1], t[2], t[1], invalide, t[4], t[5]]  # t[0] déjà dans la liste, t[1] en double
+    ouvrir_formateur(page, serveur_local, [t[0]])
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("1")
+
+    page.set_input_files("#fichier-import", fichier_json(tmp_path, "export.json", contenu))
+    compte_rendu = page.locator("#resultat-import")
+    sync_api.expect(compte_rendu).to_contain_text("4 tickets importés, 2 ignorés (doublons), 1 refusé.")
+    sync_api.expect(compte_rendu).to_contain_text(f"répété dans le fichier) : {t[0]['id']}, {t[1]['id']}.")
+    sync_api.expect(compte_rendu).to_contain_text(f"Ticket n° 5 ({t[3]['id']}) : source : valeur non autorisée")
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("5")
+    stocke = json.loads(page.evaluate("localStorage.getItem('formateur.ticketsValides')"))
+    assert [x["id"] for x in stocke] == [t[i]["id"] for i in (0, 1, 2, 4, 5)]
+    sync_api.expect(page.locator("#btn-publier")).to_be_enabled()
+
+    # Un ticket importé se retire comme les autres…
+    page.locator("#liste-valides li").nth(2).get_by_role("button", name="Retirer").click()
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("4")
+    sync_api.expect(page.locator("#btn-publier")).to_be_disabled()
+
+    # … et revient si on réimporte le fichier, sans créer de doublon.
+    page.set_input_files("#fichier-import", fichier_json(tmp_path, "export.json", contenu))
+    sync_api.expect(compte_rendu).to_contain_text("1 ticket importé, 5 ignorés (doublons), 1 refusé.")
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("5")
+
+    # La série se publie comme d'habitude, dans l'ordre de la liste.
+    page.click("#btn-publier")
+    sync_api.expect(page.locator("#serie-etat")).to_contain_text("Publiée le")
+    attendus = [f"{n + 1}. {t[i]['theme']}" for n, i in enumerate((0, 1, 4, 5, 2))]
+    assert page.locator("#serie-tickets .titre").all_inner_texts() == attendus
+    assert page.erreurs == []
+
+
+@pytest.mark.parametrize(
+    "contenu, message",
+    [
+        ("ceci n'est pas du JSON", "n'est pas un JSON valide"),
+        ("[]", "aucun ticket (tableau vide)"),
+        ('{"tickets": []}', "tableau de tickets"),
+    ],
+)
+def test_import_fichier_refuse(page, serveur_local, tmp_path, contenu, message):
+    ouvrir_formateur(page, serveur_local)
+    page.set_input_files("#fichier-import", fichier_json(tmp_path, "mauvais.json", contenu))
+    compte_rendu = page.locator("#resultat-import")
+    sync_api.expect(compte_rendu).to_have_attribute("data-etat", "erreur")
+    sync_api.expect(compte_rendu).to_contain_text("Import de « mauvais.json » impossible")
+    sync_api.expect(compte_rendu).to_contain_text(message)
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("0")
+
+
+def test_mention_liste_par_adresse_avec_infobulle(page, serveur_local):
+    ouvrir_formateur(page, serveur_local)
+    mention = page.locator(".f-memoire")
+    sync_api.expect(mention).to_contain_text("Liste enregistrée dans ce navigateur, pour cette adresse")
+    infobulle = page.locator("#infobulle-memoire")
+    sync_api.expect(infobulle).to_be_hidden()
+    mention.focus()  # au clavier comme à la souris
+    sync_api.expect(infobulle).to_be_visible()
+    sync_api.expect(infobulle).to_contain_text("localhost")
+    sync_api.expect(infobulle).to_contain_text("127.0.0.1")
