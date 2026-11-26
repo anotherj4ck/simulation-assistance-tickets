@@ -231,24 +231,50 @@ Les contrôles garantissent la forme, pas la justesse pédagogique : **relisez c
 
 ## Mesures
 
-Trois versions du générateur ont été comparées sur les 6 mêmes requêtes (Réseau, Sécurité, Impression, Comptes et accès ; sources variées), avec `ministral-3:8b`, `OLLAMA_NUM_CTX=8192`, sur une RTX 4060 Laptop (8 Go), en novembre 2026. Avec 6 générations par version, les chiffres sont indicatifs ; les écarts importants, eux, sont nets.
+Le générateur a été mesuré sur les 6 mêmes requêtes (Réseau, Sécurité, Impression, Comptes et accès ; sources variées), avec `OLLAMA_NUM_CTX=8192`, sur un PC portable : RTX 4060 Laptop (8 Go de mémoire vidéo), Core i7-13620H, 23,6 Go de mémoire vive, en novembre 2026. Avec 6 générations par colonne, les chiffres sont indicatifs ; les écarts importants, eux, sont nets.
+
+Trois versions du code, avec `ministral-3:8b` :
 
 - **A, sans exemples** : prompt système, profils tirés au sort, contrôles et relances.
 - **B, few-shot** : A + 2 tickets de `js/tickets.js` donnés en exemples à chaque génération.
 - **C, few-shot + corrections** : B + ordre des réponses imposé par le schéma, demande limitée à « 2 phrases courtes au plus », règles métier dans le prompt.
 
-| | A : sans exemples | B : few-shot | C : few-shot + corrections |
-|---|---|---|---|
-| Générations réussies | 6 / 6 | 4 / 6 | **6 / 6** |
-| Tentatives rejetées | 2 / 8 (25 %) | 11 / 15 (73 %) | **1 / 7 (14 %)** |
-| Rejets « bonne réponse la plus longue » | 1 | 7 | 1 |
-| Rejets « demande trop longue » | 1 | 7 | **0** |
-| Longueur moyenne des demandes (cible 60 à 150) | 217 car. | 217 car. | **184 car.** |
-| Réponses de plus de 190 car. | 11 / 24 | 3 / 16 | 8 / 24 |
-| Utilisateur seul classé en impact Basse | 1 / 5 | 4 / 4 | **5 / 5** |
-| Réponses ✗✗ vraiment inacceptables | 1 / 4 | 1 / 2 | **4 / 4** |
-| Réponses ✓ ou ~ qui violent une règle métier | 0 | 3 | 1 |
-| Durée par ticket | 20 à 40 s | 37 à 67 s | **≈ 20 s** |
+Puis le code de C, inchangé, avec deux autres modèles :
+
+- **D** : `qwen3:8b`.
+- **E** : `qwen3:30b`, modèle MoE (*mixture of experts*) qui n'active qu'environ 3 milliards de paramètres sur 30 à chaque token.
+
+| | A : sans exemples | B : few-shot | C : ministral-3:8b | D : qwen3:8b | E : qwen3:30b |
+|---|---|---|---|---|---|
+| Générations réussies | 6 / 6 | 4 / 6 | **6 / 6** | **6 / 6** | **6 / 6** |
+| Tentatives rejetées | 2 / 8 (25 %) | 11 / 15 (73 %) | 1 / 7 (14 %) | 1 / 7 (14 %) | **0 / 6 (0 %)** |
+| Rejets « bonne réponse la plus longue » | 1 | 7 | 1 | 1 | 0 |
+| Rejets « demande trop longue » | 1 | 7 | 0 | 0 | 0 |
+| Longueur moyenne des demandes (cible 60 à 150) | 217 car. | 217 car. | 184 car. | **107 car.** | **146 car.** |
+| Réponses de plus de 190 car. | 11 / 24 | 3 / 16 | 8 / 24 | **0 / 24** | 3 / 24 |
+| Utilisateur seul classé en impact Basse | 1 / 5 | 4 / 4 | 5 / 5 | 5 / 5 | 5 / 5 |
+| Réponses ✗✗ vraiment inacceptables | 1 / 4 | 1 / 2 | 4 / 4 | 3 / 3 | 2 / 3 |
+| Réponses ✓ ou ~ qui violent une règle métier | 0 | 3 | 1 | 1 (+ 1 ambiguë) | 1 |
+| Notes mal attribuées ou bonne réponse fausse/faible | 3 | 2 | 2 | 4 | 3 |
+| Durée moyenne par ticket (relances comprises) | 25 s | 51 s | 23 s | **14 s** (13 s hors chargement) | 21 s (17 s hors chargement) |
+| Répartition relevée avec `ollama ps` | 16 % CPU / 84 % GPU, 6,6 Go | idem | idem | **100 % GPU, 6,2 Go** | 68 % CPU / 32 % GPU, 19 Go |
+
+« Hors chargement » : le premier ticket de D et de E comprend le chargement du modèle en mémoire (environ 9 s et 28 s). La colonne « Répartition » est relevée toutes les 3 s pendant la série. Pour A, B et C (même modèle, même contexte), elle a été relevée après les générations.
+
+**Défauts pédagogiques, série D (`qwen3:8b`).**
+- Textes courts et plats : bonnes réponses de 92 et 93 caractères, sous la cible de 120.
+- Une réponse ~ qui reprend mot pour mot la bonne réponse, en y ajoutant une question : elle vaut donc mieux qu'elle.
+- Deux bonnes réponses faibles : « vérifiez que le serveur n'est pas en maintenance », « vérifiez le mot de passe de l'application ».
+- Une réponse ~ qui active un accès sans vérifier l'identité.
+- Sur le rançongiciel, la bonne réponse dit « débranchez votre ordinateur », ce qui peut se comprendre comme l'éteindre. Surtout, le point clé affirme qu'« un message de rançongiciel est une arnaque » : il enseigne donc une erreur.
+
+**Défauts pédagogiques, série E (`qwen3:30b`).**
+- Une réponse ~ envoie l'utilisateur sur le Wi-Fi de la boutique, un réseau tiers (l'alerte l'a signalé) ; dans le même ticket, la bonne réponse se limite à « redémarrez ».
+- Une bonne réponse fausse sur le fond (« écran noir = le réseau ne détecte plus votre poste »).
+- Une ✗✗ inoffensive (débrancher et rebrancher l'imprimante).
+- Une réponse ~ incorrecte sur le fond plutôt que partielle (l'imprimante ne « traiterait pas les documents externes »).
+
+En revanche, E produit les meilleurs tickets de sécurité et de compte : isoler le poste et prévenir la sécurité, impact Moyenne justifié par le risque de propagation, vérifier l'identité avant de déverrouiller. C'est aussi la série où le profil se lit le mieux dans la demande (« c'est sûrement le routeur, hier j'ai vu un technicien le configurer »).
 
 **Ce qui a marché.** Les exemples seuls ont dégradé les résultats (B) : le modèle imitait le ton des tickets, mais pas leurs longueurs. Ce sont les contraintes structurelles qui ont fait la différence (C) :
 - avec l'ordre imposé par le schéma, la bonne réponse s'écrit en dernier, une fois connue la longueur des trois autres ;
@@ -257,16 +283,36 @@ Trois versions du générateur ont été comparées sur les 6 mêmes requêtes (
 
 La règle d'impact explicite (« une seule personne = Basse, sauf propagation ») a corrigé l'erreur de qualification la plus fréquente.
 
-**Ce qui reste à relire humainement.** Un modèle 8B reste peu fiable sur le fond :
+**Ce qui reste à relire humainement.** Aucun des trois modèles testés n'est fiable sur le fond, 30B compris :
 - notes mal attribuées (une réponse ✗ meilleure que la ~) ;
 - bonne réponse parfois incohérente ;
 - demandes parfois illogiques ;
 - catégorie ou impact discutables sur les cas de sécurité ;
 - ton imposé pas toujours perceptible.
 
-Surtout, une réponse notée ~ proposait encore « un accès temporaire via mon compte admin ». Les règles du prompt réduisent ces fautes sans les éliminer.
+Surtout, chaque série contient encore une réponse notée ~ qui viole une règle métier :
+- C : « un accès temporaire via mon compte admin » ;
+- D : un accès activé sans vérifier l'identité ;
+- E : le Wi-Fi d'une boutique.
+
+Le point clé peut lui aussi être faux (série D). Les règles du prompt réduisent ces fautes sans les éliminer.
 
 **Pourquoi les alertes sont volontairement larges.** Elles ne bloquent rien et servent seulement à orienter la relecture. Une recherche de mots ne comprend pas la négation : « ne donnez jamais votre mot de passe » déclenche la même alerte que « donnez-moi votre mot de passe ». Il fallait donc choisir entre manquer une faute et signaler un passage sans problème. Une faute de sécurité notée ✓ ou ~ enseignerait un mauvais réflexe à l'apprenant, alors qu'une fausse alerte coûte quelques secondes de lecture : la liste préfère signaler trop. Dans la série C, 3 alertes sur 4 étaient sans objet ; la seule utile portait sur le cas « compte admin », trouvé grâce à « mot de passe ». « admin » a été ajouté ensuite pour le trouver directement.
+
+Les séries D et E confirment ces limites dans les deux sens :
+- en E, 1 alerte sur 5 était utile (le Wi-Fi de la boutique) ;
+- en D, la seule alerte pointait une bonne réponse faible, mais l'accès activé sans vérifier l'identité ne contient aucun mot de la liste et n'a pas été signalé ;
+- les alertes ne lisent pas le point clé, et n'ont donc pas vu « un rançongiciel est une arnaque ».
+
+Elles orientent la relecture, elles ne la remplacent pas.
+
+## Recommandation de modèle
+
+- **Pour préparer des séries à l'avance (qualité prioritaire) : `qwen3:30b`.** Aucun rejet et des demandes proches de la cible. Ce sont aussi les meilleurs tickets de sécurité et de compte, et le profil de l'utilisateur s'y lit le mieux. Il reste rapide (environ 17 s par ticket) bien qu'il tourne aux deux tiers sur le processeur, grâce à son architecture MoE. Son coût est la mémoire : 19 Go chargés, sur les 23,6 Go de mémoire vive de la machine de test. Il faut fermer les applications lourdes pendant la génération. L'avance sur les modèles 8B reste modeste : relire chaque ticket reste indispensable.
+- **Pour une génération rapide (démonstration, essai en direct) : `qwen3:8b`.** Il tient entièrement sur une carte de 8 Go et produit un ticket en 11 à 13 s. Ses textes sont plus courts et plus pauvres (réponses parfois en double, point clé faux une fois) : il demande davantage de corrections.
+- **`ministral-3:8b`** n'a plus d'avantage dans ces mesures : il déborde sur le processeur, il est plus lent que `qwen3:8b`, et sa qualité est comparable.
+
+Le modèle se choisit avec `OLLAMA_MODEL` ; le code n'a pas de modèle par défaut.
 
 ## Sécurité
 
