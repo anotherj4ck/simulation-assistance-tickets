@@ -66,6 +66,8 @@ Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette
 - **Valider** ajoute le ticket à la liste du bas, s'il est complet : exactement une bonne réponse, aucun texte vide, objet présent pour un courriel, au moins une valeur cochée pour chaque critère. **Rejeter** l'abandonne.
 - **Liste des tickets validés** : elle est gardée dans la mémoire du navigateur (`localStorage`) et survit donc à un rechargement de la page. Elle est propre à ce navigateur, sur ce poste. Chaque ticket peut être retiré ; « Vider la liste » efface tout, après confirmation.
 - **Exporter** télécharge `tickets-valides-AAAA-MM-JJ.json`, un tableau de tickets au format de `js/tickets.js`.
+- **Publier la série** n'est actif qu'avec exactement 5 tickets validés (`ticketsParSession` de `js/config.js`). Après confirmation, ces tickets deviennent la série que résolvent les apprenants, dans l'ordre de la liste. La confirmation rappelle que la série en cours sera remplacée.
+- **Série active** : l'encart du bas indique s'il y a une série publiée, avec sa date de publication et les thèmes des 5 tickets. « Retirer la série » ramène les apprenants au tirage au hasard. « Ouvrir le mode apprenant » ouvre le site dans un nouvel onglet.
 
 **Ajouter les tickets exportés au site.** Ouvrez le fichier JSON et copiez les blocs `{ ... }` (sans les crochets `[ ]` qui les entourent). Collez-les à la fin de la liste de `js/tickets.js`, avant le `];` final, en séparant chaque bloc du précédent par une virgule. Au démarrage suivant, le serveur relit `js/tickets.js` de façon stricte et signale toute erreur ; le site, lui, ignore un ticket invalide et le signale dans la console (F12).
 
@@ -176,6 +178,27 @@ Une génération prend de quelques secondes à quelques minutes, selon le modèl
 |---|---|
 | 422 | Corps invalide (catégorie inconnue, difficulté inconnue…), ou ticket rejeté 3 fois de suite par les contrôles de qualité. Le message donne le dernier motif de rejet. |
 | 503 | Ollama injoignable, délai dépassé (`OLLAMA_TIMEOUT`) ou modèle non installé. Le message dit quoi faire. |
+
+### Série publiée pour les apprenants : `/api/serie`
+
+Le formateur publie une série de tickets que les apprenants résolvent à la place du tirage au hasard. La série active est enregistrée dans `serveur/donnees/serie-active.json`. C'est une donnée d'exécution, ignorée par Git.
+
+| Requête | Effet | Réponses |
+|---|---|---|
+| `GET /api/serie` | Série active : `{ "publiee_le": "2026-11-26T09:35:00+01:00", "tickets": [ … ] }` | 200 ; 404 s'il n'y en a pas ; 500 si le fichier est devenu invalide (modifié à la main, ou `js/config.js` changé depuis la publication) |
+| `POST /api/serie` | Publie `{ "tickets": [ … ] }` ; elle remplace la série précédente | 201 ; 422 si le nombre de tickets est faux ou si un ticket est invalide (le message cite le ticket et le champ) |
+| `DELETE /api/serie` | Retire la série active | 204 ; 404 s'il n'y en avait pas |
+
+- Une série contient exactement `ticketsParSession` tickets, la valeur lue dans `js/config.js` (5).
+- Chaque ticket est revalidé avec le même validateur strict que `js/tickets.js`, à la publication comme à chaque lecture.
+- Le fichier est écrit de façon atomique (fichier temporaire, puis renommage) : un apprenant ne peut jamais lire une série à moitié écrite, et une publication refusée laisse la série précédente intacte.
+
+**Côté site apprenant** (`js/app.js`) :
+- **Quand la page est servie par ce serveur** (`127.0.0.1` ou `localhost`), elle demande la série au chargement et au début de chaque session, avec un délai de 2 s au plus.
+  - Si elle reçoit une série valide, l'accueil affiche discrètement « Série préparée par votre formateur », et la session utilise exactement ces tickets, dans l'ordre du formateur. L'ordre des réponses reste mélangé.
+  - Dans tous les autres cas (404, erreur, délai dépassé, réponse invalide), c'est le tirage au hasard habituel, sans message visible.
+- **Sur GitHub Pages ou en ouvrant `index.html` directement**, la page ne fait aucune requête : le comportement est exactement celui d'avant.
+- Le rapport final est le même dans les deux cas.
 
 ## Ce que fait le générateur
 
@@ -317,6 +340,7 @@ Le modèle se choisit avec `OLLAMA_MODEL` ; le code n'a pas de modèle par défa
 ## Sécurité
 
 - Écoute sur `127.0.0.1` uniquement, et les requêtes dont l'en-tête `Host` n'est pas `127.0.0.1` ou `localhost` sont refusées (protection contre le *DNS rebinding*).
+- Les requêtes qui modifient quelque chose (`POST`, `DELETE` sur `/api/…`) doivent venir d'une page de ce serveur. Si l'en-tête `Origin` désigne un autre site, la réponse est 403 ; un `POST` doit en plus être déclaré en JSON, sinon la réponse est 415. Sans cela, une page web quelconque ouverte par le formateur pourrait publier une série ou lancer des générations, en envoyant une requête sans `Content-Type` qui échappe aux contrôles CORS du navigateur.
 - Sont servis : `index.html`, `css/`, `js/` et les trois fichiers de la page formateur (`/formateur.html`, `/formateur.js`, `/formateur.css`), un par un, sans exposer le reste de `serveur/`. `serveur/`, `.git/`, `.venv/`, le README et les fichiers de configuration ne le sont jamais.
 - Aucun secret : Ollama local n'a pas besoin de clé.
 
@@ -327,21 +351,30 @@ python -m pip install -r serveur\requirements-dev.txt
 python -m pytest serveur\tests
 ```
 
-Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes) et les fichiers servis.
+Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis et l'API des séries.
+
+`test_navigateur.py` teste le site apprenant dans un vrai navigateur, avec Playwright et l'Edge ou le Chrome déjà installé (aucun téléchargement de navigateur) :
+- avec une série valide, la session utilise les tickets dans l'ordre jusqu'au rapport ;
+- avec une API absente, un délai dépassé ou une réponse invalide, la session revient au tirage habituel ;
+- sur un nom d'hôte non local, ou avec la page ouverte comme fichier, aucune requête n'est faite.
+
+Sans navigateur disponible, ces tests sont ignorés.
 
 ## Fichiers
 
 ```
 serveur/
   app.py                       Application FastAPI : routes, appels à Ollama, fichiers statiques
-  configuration.py             Variables d'environnement, lecture des catégories et des profils
+  configuration.py             Variables d'environnement ; lecture des catégories, de ticketsParSession et des profils
   generateur.py                Consigne (tirages au sort), schéma JSON, validation, contrôles, format final
-  exemples.py                  Lecture stricte de js/tickets.js, choix et mise en forme des exemples
+  exemples.py                  Lecture et validation strictes des tickets, choix et mise en forme des exemples
+  serie.py                     Série publiée pour les apprenants : validation, écriture atomique, lecture, retrait
   donnees/profils.json         Listes tirées au sort : prénoms, noms, services, tons, aisances
   donnees/alertes.json         Mots sensibles qui déclenchent une alerte de relecture
+  donnees/serie-active.json    Série active (créée à la publication, ignorée par Git)
   formateur/                   Page formateur (HTML, JS, CSS) : servie par le serveur local uniquement
   prompts/generateur_ticket.md Prompt système du générateur
   requirements.txt             Dépendances (versions épinglées)
-  requirements-dev.txt         Dépendances de test (pytest)
-  tests/                       Tests unitaires
+  requirements-dev.txt         Dépendances de test (pytest, Playwright)
+  tests/                       Tests unitaires et tests dans le navigateur
 ```

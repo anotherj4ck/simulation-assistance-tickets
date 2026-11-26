@@ -2,3 +2,7 @@
 .venv/
 __pycache__/
 .pytest_cache/
+
+# Donnée d'exécution : série publiée par le formateur (et son fichier temporaire d'écriture)
+serveur/donnees/serie-active.json
+serveur/donnees/.serie-active-*.tmp

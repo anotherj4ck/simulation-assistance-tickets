@@ -9,11 +9,14 @@ Lancement, depuis la racine du dépôt (voir serveur/README.md) :
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -31,8 +34,10 @@ from .configuration import (
     lire_mots_alertes,
     lire_profils,
     lire_reglages,
+    lire_tickets_par_session,
 )
 from .exemples import lire_exemples
+from . import serie as series
 from .generateur import (
     TicketRejete,
     alertes_de_relecture,
@@ -54,8 +59,16 @@ try:
     EXEMPLES, EXEMPLES_ECARTES = lire_exemples(CATEGORIES)
     MOTS_ALERTES = lire_mots_alertes()
     PROMPT_SYSTEME = lire_prompt_systeme()
+    # Taille d'une série publiée : celle d'une session du site.
+    TICKETS_PAR_SESSION = lire_tickets_par_session()
 except ErreurConfiguration as erreur:
     raise SystemExit(f"\n[serveur] Démarrage impossible : {erreur}\n") from None
+
+# Série active publiée par le formateur (donnée d'exécution, ignorée par Git).
+CHEMIN_SERIE = series.CHEMIN_SERIE
+# Les routes /api/serie sont synchrones (exécutées en parallèle par FastAPI) :
+# ce verrou évite qu'une lecture croise une publication ou un retrait.
+VERROU_SERIE = threading.Lock()
 
 # Après un ticket rejeté, on relance la génération jusqu'à 2 fois (3 essais au total).
 NB_RELANCES = 2
@@ -113,6 +126,28 @@ app = FastAPI(
 # Refuse les requêtes dont l'en-tête Host n'est pas local (protection contre
 # le « DNS rebinding » : une page web externe ne peut pas piloter l'API).
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+
+@app.middleware("http")
+async def _ecritures_depuis_ce_serveur_uniquement(request: Request, call_next):
+    """Une page web ouverte ailleurs peut envoyer un POST à 127.0.0.1 sans
+    passer par CORS (corps sans Content-Type). Les requêtes qui modifient
+    quelque chose (/api/serie, /api/generer-ticket) doivent donc venir d'une
+    page de ce serveur, et le POST être déclaré en JSON."""
+    if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path.startswith("/api/"):
+        origine = request.headers.get("origin")
+        if origine is not None and urlsplit(origine).netloc != request.headers.get("host"):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Requête refusée : elle provient d'une page qui n'est pas servie par ce serveur."},
+            )
+        type_contenu = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if request.method == "POST" and type_contenu != "application/json":
+            return JSONResponse(
+                status_code=415,
+                content={"detail": "Le corps de la requête doit être du JSON (Content-Type: application/json)."},
+            )
+    return await call_next(request)
 
 
 @app.exception_handler(ErreurOllama)
@@ -282,6 +317,55 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             f"Dernier motif de rejet : {' ; '.join(motifs)}."
         ),
     )
+
+
+# --- Série publiée par le formateur --------------------------------------------
+
+
+class PublicationSerie(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Chaque ticket est validé ensuite par le validateur strict de js/tickets.js,
+    # qui donne des messages précis (numéro du ticket, champ en cause).
+    tickets: list[Any]
+
+
+@app.get("/api/serie")
+def serie_active() -> dict:
+    """Série active (date de publication et tickets), ou 404 s'il n'y en a pas."""
+    try:
+        with VERROU_SERIE:
+            serie = series.lire_serie(CATEGORIES, TICKETS_PAR_SESSION, CHEMIN_SERIE)
+    except series.ErreurSerie as erreur:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Série active inutilisable : {erreur} Publiez une nouvelle série ou retirez celle-ci.",
+        ) from None
+    if serie is None:
+        raise HTTPException(status_code=404, detail="Aucune série publiée.")
+    return serie
+
+
+@app.post("/api/serie", status_code=201)
+def publier_serie(publication: PublicationSerie) -> dict:
+    """Publie une série ; elle remplace la précédente."""
+    try:
+        with VERROU_SERIE:
+            serie = series.publier_serie(publication.tickets, CATEGORIES, TICKETS_PAR_SESSION, CHEMIN_SERIE)
+    except series.ErreurSerie as erreur:
+        raise HTTPException(status_code=422, detail=f"Série refusée : {erreur}") from None
+    log.info("Série publiée : %s", ", ".join(t.get("id", "?") for t in serie["tickets"]))
+    return serie
+
+
+@app.delete("/api/serie", status_code=204)
+def retirer_serie() -> Response:
+    with VERROU_SERIE:
+        retiree = series.retirer_serie(CHEMIN_SERIE)
+    if not retiree:
+        raise HTTPException(status_code=404, detail="Aucune série publiée.")
+    log.info("Série retirée.")
+    return Response(status_code=204)
 
 
 # --- Site statique : index.html et les seuls dossiers du site -----------------

@@ -14,6 +14,7 @@ from serveur.configuration import (
     lire_categories,
     lire_profils,
     lire_reglages,
+    lire_tickets_par_session,
 )
 from serveur.generateur import tirer_profil
 
@@ -85,3 +86,20 @@ def test_tirage_du_profil_respecte_le_genre():
             p.nom.startswith(civilite) and p.nom[len(civilite):] in profils.noms_de_famille
         )
         assert p.service in profils.services and p.ton in profils.tons and p.aisance in profils.aisances
+
+
+def test_tickets_par_session_lu_dans_config_js():
+    assert lire_tickets_par_session() == 5
+
+
+def test_tickets_par_session_absent_vaut_5_comme_le_site(tmp_path):
+    fichier = tmp_path / "config.js"
+    fichier.write_text('window.CONFIG = { categories: ["A"] };', encoding="utf-8")
+    assert lire_tickets_par_session(fichier) == 5
+
+
+def test_tickets_par_session_invalide_bloque_le_demarrage(tmp_path):
+    fichier = tmp_path / "config.js"
+    fichier.write_text("window.CONFIG = { ticketsParSession: cinq };", encoding="utf-8")
+    with pytest.raises(ErreurConfiguration, match="ticketsParSession"):
+        lire_tickets_par_session(fichier)

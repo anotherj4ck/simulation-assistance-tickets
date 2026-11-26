@@ -111,13 +111,31 @@
           <p class="sous-titre">Exportés au format de js/tickets.js : à relire, puis à coller dans la liste.</p>
         </div>
         <div class="boutons">
-          <button class="btn principal" id="btn-exporter" type="button" disabled>Exporter (JSON)</button>
+          <button class="btn principal" id="btn-publier" type="button" disabled>Publier la série</button>
+          <button class="btn secondaire" id="btn-exporter" type="button" disabled>Exporter (JSON)</button>
           <button class="btn secondaire" id="btn-vider" type="button" disabled>Vider la liste</button>
         </div>
       </div>
+      <p class="f-infos f-aide-publier" id="aide-publier"></p>
       <p class="f-vide" id="liste-vide">Aucun ticket validé pour l'instant.</p>
       <ol class="f-liste" id="liste-valides"></ol>
       <p class="f-note-stockage" id="note-stockage" hidden>Mémoire du navigateur indisponible : la liste sera perdue à la fermeture de la page. Pensez à exporter.</p>
+    </section>
+
+    <!-- 4. Série publiée pour les apprenants -->
+    <section class="carte verre" aria-labelledby="titre-serie">
+      <div class="rapport-actions">
+        <div>
+          <h2 id="titre-serie">Série active</h2>
+          <p class="sous-titre" id="serie-etat" aria-live="polite">Vérification…</p>
+        </div>
+        <div class="boutons">
+          <a class="btn secondaire" href="./" target="_blank" rel="noopener">Ouvrir le mode apprenant ↗</a>
+          <button class="btn secondaire" id="btn-retirer-serie" type="button" hidden>Retirer la série</button>
+        </div>
+      </div>
+      <p class="erreur" id="erreur-serie" role="alert" hidden></p>
+      <ol class="f-liste" id="serie-tickets"></ol>
     </section>
   </main>
 

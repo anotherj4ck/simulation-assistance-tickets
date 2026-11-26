@@ -49,6 +49,8 @@ La priorité est calculée à partir de l'urgence et de l'impact, avec la matric
 
 Aucun serveur, aucun compte, aucune donnée envoyée : tout se passe dans le navigateur.
 
+Facultatif : un serveur local permet au formateur de générer des tickets et de publier une série que les apprenants résolvent (voir [serveur/README.md](serveur/README.md)). Sans lui, sur GitHub Pages ou en local, le site fonctionne exactement comme décrit ici.
+
 ## Structure
 
 ```

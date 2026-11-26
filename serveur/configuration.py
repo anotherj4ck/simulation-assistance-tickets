@@ -213,3 +213,30 @@ def lire_mots_alertes(chemin: Path = ALERTES_JSON) -> tuple[str, ...]:
     if not all(isinstance(m, str) and m.strip() for m in mots):
         raise ErreurConfiguration(f"{chemin} : la liste « mots » ne doit contenir que des textes non vides.")
     return tuple(m.strip() for m in mots)
+
+
+# --- Nombre de tickets par session : js/config.js (ticketsParSession) ---------
+
+TICKETS_PAR_SESSION_PAR_DEFAUT = 5  # même valeur par défaut que js/app.js
+_TICKETS_PAR_SESSION = re.compile(r"\bticketsParSession\s*:\s*([^,\n}]*)")
+
+
+def lire_tickets_par_session(chemin: Path = CONFIG_JS) -> int:
+    """Nombre de tickets d'une session, comme le site le calcule.
+
+    Clé absente : 5, comme `CFG.ticketsParSession || 5` dans js/app.js.
+    Clé présente mais pas un entier positif : ErreurConfiguration.
+    """
+    try:
+        texte = chemin.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as erreur:
+        raise ErreurConfiguration(f"impossible de lire {chemin} ({erreur}).") from None
+    trouve = _TICKETS_PAR_SESSION.search(texte)
+    if trouve is None:
+        return TICKETS_PAR_SESSION_PAR_DEFAUT
+    brut = trouve.group(1).split("//")[0].strip()
+    if not brut.isdigit() or int(brut) < 1:
+        raise ErreurConfiguration(
+            f"{chemin} : ticketsParSession doit être un nombre entier positif (trouvé : « {brut} »)."
+        )
+    return int(brut)

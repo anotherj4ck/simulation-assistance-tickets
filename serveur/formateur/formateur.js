@@ -29,6 +29,8 @@
     { cle: "impact", titre: "Impact", valeurs: NIVEAUX }
   ];
   var CLE_STOCKAGE = "formateur.ticketsValides";
+  // Une série publiée compte autant de tickets qu'une session du site (js/config.js).
+  var NB_SERIE = (window.CONFIG && window.CONFIG.ticketsParSession) || 5;
 
   var $ = function (id) { return document.getElementById(id); };
   var courant = null;   // réponse de l'API pour le ticket affiché (null : aucun)
@@ -406,6 +408,9 @@
     $("nb-valides").textContent = valides.length;
     $("liste-vide").hidden = valides.length > 0;
     $("btn-exporter").disabled = $("btn-vider").disabled = valides.length === 0;
+    $("btn-publier").disabled = valides.length !== NB_SERIE;
+    $("aide-publier").textContent = valides.length === NB_SERIE ? ""
+      : "« Publier la série » demande exactement " + NB_SERIE + " tickets validés (actuellement " + valides.length + ").";
 
     valides.forEach(function (t, i) {
       var li = element("li");
@@ -449,6 +454,103 @@
     afficherValides();
   });
 
+  /* ======================= Série publiée pour les apprenants ======================= */
+
+  var serieActive = null;
+
+  function dateLisible(iso) {
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" });
+  }
+
+  function erreurSerie(message) {
+    $("erreur-serie").hidden = !message;
+    $("erreur-serie").textContent = message || "";
+  }
+
+  function afficherSerie(serie) {
+    serieActive = serie;
+    var liste = $("serie-tickets");
+    liste.textContent = "";
+    $("btn-retirer-serie").hidden = !serie;
+    if (!serie) {
+      $("serie-etat").textContent = "Aucune série publiée : les apprenants ont le tirage au hasard habituel.";
+      return;
+    }
+    $("serie-etat").textContent = "Publiée le " + dateLisible(serie.publiee_le) +
+      ". Les apprenants qui ouvrent le site sur ce serveur reçoivent ces " + serie.tickets.length + " tickets, dans cet ordre.";
+    serie.tickets.forEach(function (t, i) {
+      var li = element("li");
+      var corps = element("div");
+      corps.appendChild(element("div", "titre", (i + 1) + ". " + (t.theme || t.id)));
+      corps.appendChild(element("div", "detail",
+        [t.nom + (t.service ? ", " + t.service : ""), t.source, enListe(t.attendu.categorie).join(" / "), t.id].join(" · ")));
+      li.appendChild(corps);
+      liste.appendChild(li);
+    });
+  }
+
+  function lireReponse(r) {
+    return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, statut: r.status, d: d }; });
+  }
+
+  function chargerSerieActive() {
+    return fetch("api/serie", { cache: "no-store" })
+      .then(lireReponse)
+      .then(function (res) {
+        if (res.statut === 200 && res.d && Array.isArray(res.d.tickets)) {
+          erreurSerie(null);
+          afficherSerie(res.d);
+        } else if (res.statut === 404) {
+          erreurSerie(null);
+          afficherSerie(null);
+        } else {
+          afficherSerie(null);
+          erreurSerie(messageErreur(res));
+        }
+      })
+      .catch(function () {
+        $("serie-etat").textContent = "État inconnu : le serveur local ne répond pas.";
+      });
+  }
+
+  $("btn-publier").addEventListener("click", function () {
+    var question = "Publier ces " + valides.length + " tickets comme série pour les apprenants ?\n\n" +
+      (serieActive
+        ? "Elle remplacera la série en cours, publiée le " + dateLisible(serieActive.publiee_le) + "."
+        : "Elle remplacera la série en cours s'il y en a une (aucune pour l'instant).");
+    if (!window.confirm(question)) return;
+    var bouton = $("btn-publier");
+    bouton.disabled = true;
+    erreurSerie(null);
+    fetch("api/serie", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tickets: valides })
+    })
+      .then(lireReponse)
+      .then(function (res) {
+        if (res.ok && res.d) {
+          afficherSerie(res.d);
+          $("message-statut").textContent = "✓ Série publiée : les apprenants la recevront au début de leur prochaine session.";
+        } else {
+          erreurSerie(messageErreur(res));
+        }
+      })
+      .catch(function () { erreurSerie("Le serveur local ne répond pas : la série n'a pas été publiée."); })
+      .then(function () { bouton.disabled = valides.length !== NB_SERIE; });
+  });
+
+  $("btn-retirer-serie").addEventListener("click", function () {
+    if (!window.confirm("Retirer la série active ? Les apprenants reviendront au tirage au hasard habituel.")) return;
+    fetch("api/serie", { method: "DELETE" })
+      .then(function (r) {
+        if (r.status === 204 || r.status === 404) { erreurSerie(null); afficherSerie(null); return; }
+        return lireReponse(r).then(function (res) { erreurSerie(messageErreur(res)); });
+      })
+      .catch(function () { erreurSerie("Le serveur local ne répond pas : la série n'a pas été retirée."); });
+  });
+
   /* ======================= Démarrage ======================= */
 
   majBoutonTheme();
@@ -462,4 +564,5 @@
   valides = chargerValides();
   afficherValides();
   verifierSante();
+  chargerSerieActive();
 })();

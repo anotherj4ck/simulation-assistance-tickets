@@ -116,6 +116,8 @@ h3.f-titre { font-size: .8rem; margin: 6px 0 0; text-transform: uppercase; lette
 .f-vide { color: var(--discret); margin: 0; }
 .f-note-stockage { font-size: .82rem; color: var(--ko); margin: 8px 0 0; }
 .btn.petit { padding: 6px 12px; font-size: .8rem; flex: none; }
+a.btn { display: inline-block; text-decoration: none; color: var(--texte); }
+.f-aide-publier { margin: -8px 0 12px; }
 
 @media (max-width: 860px) {
   .f-form { grid-template-columns: 1fr; }

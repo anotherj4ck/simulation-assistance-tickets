@@ -172,11 +172,12 @@ def en_liste(valeur: str | list[str]) -> list[str]:
     return valeur if isinstance(valeur, list) else [valeur]
 
 
-def lire_tickets(categories: tuple[str, ...], chemin: Path = TICKETS_JS) -> tuple[TicketSite, ...]:
-    """Lit et valide tous les tickets du site. Le moindre problème bloque le démarrage."""
+def valider_tickets(bruts: list, categories: tuple[str, ...]) -> tuple[list[TicketSite], list[str]]:
+    """Validation stricte, commune à js/tickets.js et aux séries publiées par le
+    formateur. Renvoie (tickets valides, problèmes) ; aucun problème = tout est valide."""
     problemes: list[str] = []
     tickets: list[TicketSite] = []
-    for n, brut in enumerate(_lire_brut(chemin), 1):
+    for n, brut in enumerate(bruts, 1):
         nom = brut.get("id", "sans id") if isinstance(brut, dict) else "?"
         try:
             tickets.append(TicketSite.model_validate(brut, context={"categories": categories}))
@@ -184,9 +185,14 @@ def lire_tickets(categories: tuple[str, ...], chemin: Path = TICKETS_JS) -> tupl
             for err in e.errors():
                 lieu = ".".join(str(x) for x in err["loc"]) or "ticket"
                 problemes.append(f"ticket n° {n} ({nom}) : {lieu} : {err['msg']}")
-
     ids = [t.id for t in tickets]
     problemes += [f"identifiant en double : {i}" for i in sorted({i for i in ids if ids.count(i) > 1})]
+    return tickets, problemes
+
+
+def lire_tickets(categories: tuple[str, ...], chemin: Path = TICKETS_JS) -> tuple[TicketSite, ...]:
+    """Lit et valide tous les tickets du site. Le moindre problème bloque le démarrage."""
+    tickets, problemes = valider_tickets(_lire_brut(chemin), categories)
     if problemes:
         details = "\n  - ".join(problemes[:10])
         reste = f"\n  … et {len(problemes) - 10} autre(s)" if len(problemes) > 10 else ""

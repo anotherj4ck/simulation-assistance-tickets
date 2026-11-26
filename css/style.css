@@ -115,6 +115,7 @@ main { position: relative; z-index: 1; max-width: 1240px; margin: 20px auto 40px
 .consigne { text-align: left; margin: 0 auto 20px; padding-left: 1.4em; max-width: 480px; }
 .consigne li { margin-bottom: 8px; }
 .erreur { color: var(--ko); font-weight: 700; margin-top: 20px; }
+.info-serie { margin: 18px 0 0; font-size: .85rem; color: var(--discret); }
 
 /* ---------- Boutons ---------- */
 .btn {

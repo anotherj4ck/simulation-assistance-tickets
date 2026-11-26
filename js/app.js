@@ -1,6 +1,8 @@
 /*
  * Simulation d'assistance informatique — logique de l'application.
  * Tout tourne dans le navigateur : pas de serveur, pas de compte, aucune donnée envoyée.
+ * Seule exception, facultative : servie par le serveur local du formateur
+ * (serveur/, sur 127.0.0.1), la page demande la série qu'il a publiée (voir « Série du formateur »).
  */
 (function () {
   "use strict";
@@ -143,6 +145,57 @@
     });
   }
 
+  /* ======================= Série du formateur ======================= */
+
+  // Quand le site est servi par le serveur local (serveur/app.py), le formateur
+  // peut y publier une série de tickets. La page ne la demande que dans ce cas :
+  // sur GitHub Pages ou en ouvrant index.html directement, aucune requête n'est
+  // faite et tout se passe exactement comme avant.
+  var URL_SERIE = "api/serie";
+  var DELAI_SERIE_MS = 2000;
+  var SERVEUR_LOCAL = /^https?:$/.test(location.protocol) &&
+    (location.hostname === "127.0.0.1" || location.hostname === "localhost");
+
+  // Série valide = exactement NB_PAR_SESSION tickets, chacun valide (mêmes règles
+  // que js/tickets.js). Sinon null : la session reprend le tirage au hasard.
+  function serieValide(donnees) {
+    if (!donnees || !Array.isArray(donnees.tickets) || donnees.tickets.length !== NB_PAR_SESSION) return null;
+    for (var i = 0; i < donnees.tickets.length; i++) {
+      var p = problemesTicket(donnees.tickets[i]);
+      if (p.length) {
+        console.warn("Série du formateur ignorée (ticket " + (i + 1) + ") : " + p.join(" ; "));
+        return null;
+      }
+    }
+    return donnees.tickets;
+  }
+
+  // Promesse : les tickets de la série, ou null (pas de série, erreur réseau,
+  // délai de 2 s dépassé, réponse invalide). Jamais de message visible.
+  function chargerSerie() {
+    if (!SERVEUR_LOCAL || typeof fetch !== "function" || typeof AbortController !== "function") {
+      return Promise.resolve(null);
+    }
+    var controleur = new AbortController();
+    var minuteur = setTimeout(function () { controleur.abort(); }, DELAI_SERIE_MS);
+    return fetch(URL_SERIE, { cache: "no-store", signal: controleur.signal })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(serieValide)
+      .catch(function () { return null; })
+      .then(function (serie) { clearTimeout(minuteur); return serie; });
+  }
+
+  // Lance action(serie). Hors serveur local, l'appel est immédiat avec null :
+  // même déroulement qu'avant l'ajout des séries.
+  function avecSerie(bouton, action) {
+    if (!SERVEUR_LOCAL) { action(null); return; }
+    bouton.disabled = true;
+    chargerSerie().then(function (serie) {
+      bouton.disabled = false;
+      action(serie);
+    });
+  }
+
   /* ======================= État ======================= */
 
   var etat = {
@@ -208,6 +261,9 @@
     }
     $("nb-tickets").textContent = Math.min(NB_PAR_SESSION, reserve.length);
     $("nom").focus();
+
+    // Mention discrète si le formateur a publié une série (serveur local uniquement).
+    if (SERVEUR_LOCAL) chargerSerie().then(function (serie) { $("info-serie").hidden = !serie; });
   }
 
   $("form-nom").addEventListener("submit", function (e) {
@@ -225,12 +281,19 @@
     $("btn-commencer").focus();
   });
 
-  $("btn-commencer").addEventListener("click", demarrerSession);
+  // La série est redemandée à chaque début de session : le formateur a pu la
+  // publier ou la retirer depuis l'ouverture de la page.
+  $("btn-commencer").addEventListener("click", function () {
+    avecSerie($("btn-commencer"), demarrerSession);
+  });
 
   /* ======================= Session ======================= */
 
-  function demarrerSession() {
-    var tirage = melanger(reserve).slice(0, Math.min(NB_PAR_SESSION, reserve.length));
+  // serie : tickets publiés par le formateur, utilisés tels quels et dans son
+  // ordre ; null : tirage au hasard dans la réserve, comme d'habitude.
+  // Dans les deux cas, l'ordre des réponses est mélangé ci-dessous.
+  function demarrerSession(serie) {
+    var tirage = serie || melanger(reserve).slice(0, Math.min(NB_PAR_SESSION, reserve.length));
     var annee = new Date().getFullYear();
     etat.session = tirage.map(function (t) {
       return {
@@ -654,7 +717,7 @@
   $("btn-recommencer").addEventListener("click", function () {
     if (!etat.rapportTelecharge && !confirm("Le rapport n'a pas été téléchargé. Commencer une nouvelle session quand même ?")) return;
     etat.rapportTelecharge = true;
-    demarrerSession();
+    avecSerie($("btn-recommencer"), demarrerSession);
   });
 
   /* ======================= Protection contre la fermeture ======================= */
