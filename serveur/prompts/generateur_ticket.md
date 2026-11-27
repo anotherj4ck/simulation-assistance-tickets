@@ -31,6 +31,8 @@ Exactement 4 réponses dans `reponses`, chacune avec `note`, `grossiere` et `tex
 
 Le `texte` d'une réponse est ce que le technicien dit ou écrit à l'utilisateur, au style direct. Il ne donne jamais d'indice sur sa note (pas de « bonne réponse », « (faux) », « idéalement »).
 
+**Ce que l'utilisateur a déjà fait.** Si la demande dit que l'utilisateur a déjà essayé quelque chose (redémarrer, vérifier le câble, changer les piles, relancer l'impression…), les réponses notées 2 et 1 ne le lui proposent JAMAIS à nouveau. La bonne réponse en tient compte explicitement (« Vous avez déjà redémarré : regardons donc… ») et passe à l'étape suivante. Redemander ce qui a déjà été fait est une faute : c'est au mieux une réponse fausse (note 0).
+
 ## Règles métier : interdites dans les réponses notées 2 et 1
 
 Une réponse notée 2 (bonne) ou 1 (en partie vraie) ne viole JAMAIS une de ces règles. Une réponse qui en viole une est forcément notée 0 ; c'est d'ailleurs la matière idéale d'une réponse grossière.
@@ -58,15 +60,17 @@ Une réponse notée 2 (bonne) ou 1 (en partie vraie) ne viole JAMAIS une de ces 
 Chaque champ est une liste qui contient une valeur, ou deux valeurs voisines quand la qualification se discute vraiment. Dans la plupart des cas, une seule valeur suffit.
 
 - `type` : « Incident » (quelque chose qui marchait ne marche plus, ou un risque de sécurité) ou « Demande » (demande de service : accès, matériel, installation, information).
-- `categorie` : la catégorie principale indiquée dans le message de l'utilisateur, éventuellement suivie d'une seconde si elle se discute. Pour un ticket de sécurité (hameçonnage, virus, rançongiciel, fuite de données, ingénierie sociale), « Sécurité » seule : la reconnaître est justement ce que le ticket enseigne.
+- `categorie` : la catégorie principale indiquée dans le message de l'utilisateur, éventuellement suivie d'une seconde si elle se discute. Un problème d'imprimante ou de numérisation relève toujours de « Impression », jamais de « Matériel ». Pour un ticket de sécurité (hameçonnage, virus, rançongiciel, fuite de données, ingénierie sociale), « Sécurité » seule : la reconnaître est justement ce que le ticket enseigne.
 
 Grille Urgence (à quel point c'est pressé) :
 
 - Très haute : chaque minute compte (sécurité, échéance imminente).
-- Haute : l'utilisateur est bloqué.
+- Haute : l'utilisateur est bloqué, il ne peut plus faire son travail.
 - Moyenne : le travail est gêné, ou un contournement est possible.
 - Basse : confort.
 - Très basse : aucune gêne, la demande peut attendre.
+
+Règle impérative pour l'urgence : **« Haute » seulement si l'utilisateur est bloqué ; s'il est gêné ou peut contourner le problème (autre poste, autre imprimante, autre outil, travail possible en attendant), c'est « Moyenne »**. Le ton pressé ou agacé de l'utilisateur ne change pas l'urgence.
 
 Grille Impact (qui est touché) :
 

@@ -69,6 +69,16 @@ RAPPEL_REGLES_METIER = (
     " rançongiciel suspecté : isoler le poste du réseau sans l'éteindre"
 )
 
+# Rappels courts de deux règles détaillées dans prompts/generateur_ticket.md.
+RAPPEL_DEJA_FAIT = (
+    "ce que l'utilisateur dit avoir déjà fait dans sa demande (redémarrer, vérifier un câble…) : aucune"
+    " réponse notée 2 ou 1 ne le lui propose à nouveau ; la bonne réponse en tient compte explicitement"
+)
+RAPPEL_URGENCE = (
+    "urgence : « Haute » seulement si l'utilisateur est bloqué ; s'il est seulement gêné ou peut"
+    " contourner le problème, « Moyenne »"
+)
+
 # Rejet seulement si une longueur dépasse largement ces cibles.
 LONGUEUR_MAX_DEMANDE = 250
 LONGUEUR_MAX_REPONSE = 300
@@ -124,6 +134,54 @@ class Consigne:
     avec_grossiere: bool
     profil: Profil
     exemples: tuple[TicketSite, ...]
+    sous_theme: str | None = None
+
+
+# --- Sous-thème imposé : variété à l'intérieur d'une catégorie ------------------
+
+# Mots trop courants pour distinguer deux thèmes.
+_MOTS_VIDES = {
+    "les", "des", "une", "sur", "par", "pas", "qui", "que", "son", "ses", "aux", "dans", "avec",
+    "pour", "plus", "sans", "depuis", "apres", "tres", "sous", "vers", "probleme", "panne",
+}
+
+
+def _mots_significatifs(texte: str) -> set[str]:
+    """Mots d'au moins 3 lettres, sans accents ni pluriel final : « Wi-Fi » -> wifi,
+    « Écrans » -> ecran. Le tiret est supprimé pour garder « Wi-Fi » d'un seul tenant."""
+    simple = unicodedata.normalize("NFKD", texte.replace("-", "")).encode("ascii", "ignore").decode().casefold()
+    mots = set()
+    for mot in re.findall(r"[a-z0-9]+", simple):
+        if len(mot) > 3 and mot[-1] in "sx":
+            mot = mot[:-1]
+        if len(mot) >= 3 and mot not in _MOTS_VIDES:
+            mots.add(mot)
+    return mots
+
+
+def deja_vu(sous_theme: str, themes_deja_vus) -> bool:
+    """Le sous-thème correspond-il à un thème déjà présent chez le formateur ?
+
+    Les thèmes reçus sont libres (champ « theme » écrit par le modèle) : on compare
+    les mots significatifs. Il y a correspondance quand ceux de l'un sont tous
+    contenus dans l'autre (« Clavier » / « clavier », « Batterie » / « batterie
+    de portable »), mais pas pour un seul mot commun (« Écran noir » / « écran externe »).
+    """
+    mots = _mots_significatifs(sous_theme)
+    for theme in themes_deja_vus:
+        autres = _mots_significatifs(theme)
+        if mots and autres and (mots <= autres or autres <= mots):
+            return True
+    return False
+
+
+def choisir_sous_theme(sous_themes: tuple[str, ...], themes_deja_vus, alea: random.Random = _alea) -> str | None:
+    """Un sous-thème au hasard, de préférence parmi ceux pas encore vus ; quand
+    tous l'ont été, on repart de la liste complète."""
+    if not sous_themes:
+        return None
+    nouveaux = [s for s in sous_themes if not deja_vu(s, themes_deja_vus)]
+    return alea.choice(nouveaux or list(sous_themes))
 
 
 def tirer_consigne(
@@ -133,9 +191,12 @@ def tirer_consigne(
     profils: Profils,
     exemples: tuple[TicketSite, ...],
     alea: random.Random = _alea,
+    *,
+    sous_themes: tuple[str, ...] = (),
+    themes_deja_vus=(),
 ) -> Consigne:
     """Complète la demande : source tirée au sort si absente, réponse grossière
-    ou non, profil de l'utilisateur, tickets d'exemple."""
+    ou non, profil de l'utilisateur, tickets d'exemple, sous-thème imposé."""
     return Consigne(
         categorie=categorie,
         source=source or alea.choice(SOURCES),
@@ -143,6 +204,7 @@ def tirer_consigne(
         avec_grossiere=alea.random() < PROBABILITE_TICKET_AVEC_GROSSIERE,
         profil=tirer_profil(profils, alea),
         exemples=choisir_exemples(exemples, categorie, alea),
+        sous_theme=choisir_sous_theme(sous_themes, themes_deja_vus, alea),
     )
 
 
@@ -172,6 +234,13 @@ def message_utilisateur(consigne: Consigne, motifs_precedents: list[str] | None 
         "",
         "Rédige un nouveau ticket, sur un cas concret, avec ces paramètres :",
         f"- un problème différent de ceux des exemples, mais qui relève bien de la catégorie {consigne.categorie}",
+    ]
+    if consigne.sous_theme:
+        lignes.append(
+            f"- sous-thème imposé : « {consigne.sous_theme} » ; le problème porte sur ce sous-thème, et le"
+            " champ theme le reprend en 1 à 4 mots"
+        )
+    lignes += [
         f"- utilisateur : nom = « {profil.nom} », service = « {profil.service} » (recopie-les tels quels) ;"
         f" c'est {'une femme' if profil.genre == 'femme' else 'un homme'}, accorde les mots en conséquence",
         f"- ton de l'utilisateur : {profil.ton}",
@@ -186,6 +255,8 @@ def message_utilisateur(consigne: Consigne, motifs_precedents: list[str] | None 
         " les deux fausses, puis la réponse en partie vraie, puis la bonne en dernier ; la bonne doit être"
         " plus courte que la plus longue des trois autres",
         f"- règles métier, pour les réponses notées 2 et 1 : {RAPPEL_REGLES_METIER}",
+        f"- {RAPPEL_DEJA_FAIT}",
+        f"- {RAPPEL_URGENCE}",
     ]
     if motifs_precedents:
         lignes += ["", "Ta tentative précédente a été rejetée pour ces raisons :"]

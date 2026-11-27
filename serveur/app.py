@@ -14,7 +14,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlsplit
 
 import httpx
@@ -24,7 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .configuration import (
     DIFFICULTE_PAR_DEFAUT,
@@ -36,6 +36,7 @@ from .configuration import (
     lire_mots_alertes,
     lire_profils,
     lire_reglages,
+    lire_sous_themes,
     lire_tickets_par_session,
 )
 from .exemples import examiner_tickets, lire_exemples
@@ -64,6 +65,8 @@ try:
     PROMPT_SYSTEME = lire_prompt_systeme()
     # Taille d'une série publiée : celle d'une session du site.
     TICKETS_PAR_SESSION = lire_tickets_par_session()
+    # Sous-thèmes par catégorie : un est imposé à chaque génération, pour varier les cas.
+    SOUS_THEMES = lire_sous_themes(CATEGORIES)
 except ErreurConfiguration as erreur:
     raise SystemExit(f"\n[serveur] Démarrage impossible : {erreur}\n") from None
 
@@ -293,6 +296,11 @@ class DemandeTicket(BaseModel):
     categorie: str
     difficulte: Difficulte = DIFFICULTE_PAR_DEFAUT
     source: Source | None = None
+    # Thèmes que le formateur a déjà (liste validée, dernier ticket généré) : le
+    # sous-thème imposé les évite tant qu'il en reste d'autres. Taille bornée.
+    themes_deja_vus: list[Annotated[str, StringConstraints(max_length=200)]] = Field(
+        default_factory=list, max_length=500
+    )
 
 
 @app.post("/api/generer-ticket")
@@ -303,7 +311,10 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             detail=f"Catégorie inconnue : « {demande.categorie} ». Valeurs possibles : {', '.join(CATEGORIES)}.",
         )
 
-    consigne = tirer_consigne(demande.categorie, demande.difficulte, demande.source, PROFILS, EXEMPLES)
+    consigne = tirer_consigne(
+        demande.categorie, demande.difficulte, demande.source, PROFILS, EXEMPLES,
+        sous_themes=SOUS_THEMES[demande.categorie], themes_deja_vus=demande.themes_deja_vus,
+    )
     schema = schema_ticket(CATEGORIES, consigne)
     motifs: list[str] = []
     debut = time.perf_counter()
@@ -361,6 +372,7 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
                     "aisance": consigne.profil.aisance,
                 },
                 "exemples": [e.id for e in consigne.exemples],
+                "sous_theme": consigne.sous_theme,
             },
         }
 

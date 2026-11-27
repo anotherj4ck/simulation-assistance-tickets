@@ -40,6 +40,7 @@
   var blocs = [];       // { note: <select>, texte: <textarea> } pour chaque réponse
   var valides = [];     // tickets validés, au format de js/tickets.js
   var minuteur = null;
+  var dernierGenere = [];  // thème et sous-thème du dernier ticket généré (validé, rejeté ou affiché)
 
   function element(balise, classe, texte) {
     var el = document.createElement(balise);
@@ -145,11 +146,23 @@
     }
   }
 
+  // Thèmes déjà présents : ceux de la liste validée et du dernier ticket généré,
+  // sans doublon. Seuls des textes courts sont envoyés, jamais les tickets.
+  function themesDejaVus() {
+    var vus = [];
+    valides.map(function (t) { return t.theme; }).concat(dernierGenere).forEach(function (theme) {
+      if (typeof theme === "string" && theme.trim() && vus.indexOf(theme) === -1) vus.push(theme.slice(0, 200));
+    });
+    return vus.slice(-500);
+  }
+
   $("form-generation").addEventListener("submit", function (ev) {
     ev.preventDefault();
     if (courant && !window.confirm("Le ticket affiché n'a été ni validé ni rejeté. Le remplacer par un nouveau ?")) return;
     var corps = { categorie: $("g-categorie").value, difficulte: $("g-difficulte").value };
     if ($("g-source").value) corps.source = $("g-source").value;
+    // Pour varier les cas : le serveur évite les sous-thèmes déjà présents chez le formateur.
+    corps.themes_deja_vus = themesDejaVus();
 
     erreurGeneration(null);
     $("message-statut").textContent = "";
@@ -259,6 +272,7 @@
       infos.appendChild(document.createTextNode(valeur));
     }
     ajouter("Profil imposé", [p.ton, p.aisance].filter(Boolean).join(" ; "));
+    ajouter("Sous-thème", c.sous_theme);
     ajouter("Difficulté", c.difficulte);
     ajouter("Tentatives", String(reponse.tentatives || 1));
     ajouter("Exemples", (c.exemples || []).join(", "));
@@ -322,6 +336,7 @@
   function afficherTicket(reponse) {
     var t = reponse.ticket;
     courant = reponse;
+    dernierGenere = [t.theme, (reponse.consigne || {}).sous_theme].filter(Boolean);
     $("e-id").textContent = t.id;
     $("e-theme").value = t.theme || "";
     $("e-source").value = t.source;

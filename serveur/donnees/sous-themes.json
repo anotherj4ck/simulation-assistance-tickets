@@ -1,0 +1,48 @@
+{
+  "_lisezmoi": "Sous-thèmes tirés au sort par le serveur, un par génération, dans la catégorie demandée. Les clés sont exactement les catégories de js/config.js ; au moins 8 sous-thèmes par catégorie, courts (1 à 5 mots), tous différents. Rien sur l'impression ou la numérisation hors de « Impression ». Le fichier est contrôlé au démarrage du serveur.",
+  "Matériel": [
+    "clavier", "souris", "batterie de portable", "station d'accueil", "webcam", "casque audio",
+    "surchauffe du portable", "disque dur bruyant", "port USB", "bloc d'alimentation",
+    "écran externe", "lecteur de badge"
+  ],
+  "Poste de travail": [
+    "démarrage très lent", "mise à jour Windows bloquée", "disque plein", "écran bleu",
+    "session qui se ferme", "son absent", "heure système fausse", "résolution d'écran",
+    "icônes disparues du bureau", "mise en veille impossible"
+  ],
+  "Réseau": [
+    "Wi-Fi qui décroche", "câble réseau débranché", "VPN en télétravail", "site web inaccessible",
+    "lenteur du réseau", "Wi-Fi invité", "partage de connexion du téléphone", "conflit d'adresse IP",
+    "salle de réunion sans réseau", "proxy du navigateur"
+  ],
+  "Logiciel": [
+    "logiciel qui plante à l'ouverture", "demande d'installation", "licence expirée", "macro Excel",
+    "mise à jour d'application", "PDF illisible", "site mal affiché dans le navigateur",
+    "logiciel métier lent", "complément Office", "extension de navigateur"
+  ],
+  "Impression": [
+    "bourrage papier", "toner épuisé", "imprimante hors ligne", "impression en noir et blanc forcée",
+    "file d'attente bloquée", "numérisation vers courriel", "imprimante réseau introuvable",
+    "impression recto verso", "impression sécurisée par badge"
+  ],
+  "Messagerie et collaboratif": [
+    "boîte aux lettres pleine", "courriel non reçu", "signature de courriel", "calendrier partagé",
+    "réunion Teams sans son", "message d'absence", "pièce jointe trop lourde", "liste de diffusion",
+    "notifications Teams", "courriel au mauvais destinataire"
+  ],
+  "Fichiers et partages": [
+    "fichier supprimé par erreur", "dossier partagé inaccessible", "synchronisation OneDrive",
+    "fichier verrouillé par un collègue", "version précédente d'un fichier", "lecteur réseau disparu",
+    "droits sur un dossier", "clé USB illisible", "espace OneDrive saturé", "partage de fichier externe"
+  ],
+  "Comptes et accès": [
+    "mot de passe expiré", "compte verrouillé", "double authentification sur nouveau téléphone",
+    "arrivée d'un nouveau collaborateur", "départ d'un collaborateur", "accès à une application métier",
+    "badge d'accès aux locaux", "changement de service", "boîte de messagerie partagée", "mot de passe oublié"
+  ],
+  "Sécurité": [
+    "courriel d'hameçonnage", "rançongiciel", "clé USB trouvée", "appel d'un faux support",
+    "ordinateur portable perdu", "mot de passe sur un post-it", "alerte antivirus", "fausse facture",
+    "connexion suspecte au compte", "logiciel non autorisé"
+  ]
+}

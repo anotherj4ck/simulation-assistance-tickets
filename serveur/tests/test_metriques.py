@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 
 import httpx
 import pytest
@@ -82,7 +83,7 @@ def test_nom_sans_etiquette_equivaut_a_latest():
 # --- Route /api/generer-ticket avec un faux Ollama ------------------------------------
 
 
-def ticket_valide(schema: dict) -> dict:
+def ticket_valide(schema: dict, categorie: str = "Réseau") -> dict:
     """Ticket conforme au schéma reçu (nom, service, source, ordre des réponses imposés)."""
     p = schema["properties"]
     reponses = p["reponses"]["prefixItems"]
@@ -100,7 +101,7 @@ def ticket_valide(schema: dict) -> dict:
             for r, t in zip(reponses, textes)
         ],
         "pointCle": "vérifier d'abord si le problème est général.",
-        "attendu": {"type": ["Incident"], "categorie": ["Réseau"], "urgence": ["Haute"], "impact": ["Basse"]},
+        "attendu": {"type": ["Incident"], "categorie": [categorie], "urgence": ["Haute"], "impact": ["Basse"]},
     }
 
 
@@ -120,7 +121,10 @@ class FauxOllama:
             if suivante == "rejet":  # réponse illisible : le serveur relance
                 contenu, metriques = "pas du JSON", chat(1_000_000_000, 500_000_000, 3400, 20, 400_000_000)
             else:
-                contenu, metriques = json.dumps(ticket_valide(corps["format"])), suivante
+                # La catégorie demandée figure dans la consigne : « catégorie principale : X (… ».
+                consigne = corps["messages"][-1]["content"]
+                categorie = re.search(r"catégorie principale : (.+?) \(", consigne).group(1)
+                contenu, metriques = json.dumps(ticket_valide(corps["format"], categorie)), suivante
             return httpx.Response(200, json={"message": {"content": contenu}, **metriques})
         if requete.url.path == "/api/show":
             return httpx.Response(200, json=self.show) if self.show else httpx.Response(500, json={"error": "en panne"})

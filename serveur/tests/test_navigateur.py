@@ -509,3 +509,35 @@ def test_modele_entierement_sur_le_gpu(page, serveur_local):
     ouvrir_formateur(page, serveur_local)
     infos = generer_simule(page, {**METRIQUES, "repartition": {**METRIQUES["repartition"], "part_gpu": 1.0, "part_cpu": 0.0}})
     assert "Mémoire : 100 % GPU" in infos
+
+
+# --- Sous-thèmes : ce que la page envoie, ce qu'elle affiche ---------------------------
+
+
+def test_page_envoie_les_themes_deja_vus_et_affiche_le_sous_theme(page, serveur_local):
+    ouvrir_formateur(page, serveur_local, TICKETS[:2])
+    recus = []
+
+    def repondre(route):
+        recus.append(json.loads(route.request.post_data))
+        n = len(recus)
+        reponse = {
+            "ticket": {**TICKETS[5 + n], "theme": f"Thème généré {n}"}, "alertes": [], "tentatives": 1,
+            "modele": "m", "consigne": {"sous_theme": f"sous-thème {n}", "difficulte": "facile", "exemples": []},
+        }
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(reponse))
+
+    page.route("**/api/generer-ticket", repondre)
+    page.select_option("#g-categorie", "Matériel")
+    page.click("#btn-generer")
+    sync_api.expect(page.locator("#zone-ticket")).to_be_visible()
+    assert recus[0]["categorie"] == "Matériel"
+    assert recus[0]["themes_deja_vus"] == [TICKETS[0]["theme"], TICKETS[1]["theme"]]
+    sync_api.expect(page.locator("#e-infos")).to_contain_text("Sous-thème : sous-thème 1")
+
+    # Le dernier ticket généré compte aussi, même rejeté : son thème et son sous-thème.
+    page.click("#btn-rejeter")
+    page.click("#btn-generer")
+    sync_api.expect(page.locator("#e-infos")).to_contain_text("Sous-thème : sous-thème 2")
+    assert recus[1]["themes_deja_vus"] == [TICKETS[0]["theme"], TICKETS[1]["theme"], "Thème généré 1", "sous-thème 1"]
+    assert page.erreurs == []

@@ -59,7 +59,7 @@ Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette
 - **Génération** : choisissez la catégorie (liste de `js/config.js`), la difficulté et, si vous le souhaitez, la source (sinon elle est tirée au hasard), puis cliquez sur « Générer ». Un indicateur tourne pendant l'attente (comptez 20 à 60 s) et affiche le temps écoulé.
 - **Alertes** : les passages sensibles des réponses notées ✓ ou ~ apparaissent dans un bandeau orange au-dessus du ticket (voir « Alertes de relecture » plus bas).
 - **Informations sur la génération** : une ligne sous le titre du ticket rappelle :
-  - le profil imposé, la difficulté, le nombre de tentatives et les exemples utilisés ;
+  - le profil imposé, le sous-thème imposé, la difficulté, le nombre de tentatives et les exemples utilisés ;
   - le modèle avec sa taille et sa quantification, par exemple « qwen3:8b (8,2B · Q4_K_M) » ;
   - la répartition en mémoire, par exemple « 100 % GPU » ou « 16 % CPU / 84 % GPU » ;
   - la durée totale, chargement du modèle compris, par exemple « 12,3 s (dont chargement 2,1 s) » ;
@@ -162,6 +162,7 @@ Corps JSON :
 | `categorie` | oui | Une catégorie de `js/config.js` (ex. `"Réseau"`) |
 | `difficulte` | non | `"facile"`, `"pas trop difficile"` (défaut), `"difficile"` |
 | `source` | non | `"Téléphone"`, `"Courriel"`, `"Direct"`, `"Helpdesk"`, `"Autre"`. Si elle est absente, elle est tirée au sort. |
+| `themes_deja_vus` | non | Thèmes déjà présents chez le formateur (500 au plus, 200 caractères chacun). Le sous-thème imposé les évite tant qu'il en reste d'autres. La page formateur envoie les thèmes de sa liste validée, plus le thème et le sous-thème du dernier ticket généré. |
 
 ```powershell
 $corps = @{ categorie = "Réseau"; difficulte = "pas trop difficile" } | ConvertTo-Json
@@ -193,7 +194,8 @@ Réponse :
   "consigne": {
     "categorie": "Réseau", "source": "Direct", "difficulte": "pas trop difficile", "avec_grossiere": true,
     "profil": { "nom": "Mme Brunet", "service": "RH", "ton": "pressé, il a une échéance proche", "aisance": "…" },
-    "exemples": ["t13-vpn", "t23-wi-fi-en-salle-de-reunion"]
+    "exemples": ["t13-vpn", "t23-wi-fi-en-salle-de-reunion"],
+    "sous_theme": "VPN en télétravail"
   }
 }
 ```
@@ -275,6 +277,12 @@ En cas de rejet, la génération est relancée jusqu'à 2 fois ; le modèle reç
 
 **Réponses grossières (✗✗).** Le serveur décide lui-même, au hasard, si le ticket en contient une : la probabilité est de 0,6 (60 %), fixée par la constante `PROBABILITE_TICKET_AVEC_GROSSIERE` dans `generateur.py`. Comme chaque ticket a 2 réponses fausses, cela donne en moyenne 0,6 × 1 / 2 = 30 % de réponses fausses grossières, la même proportion que dans `js/tickets.js`.
 
+**Sous-thème imposé.** Sans consigne plus précise, un modèle retombe toujours sur les mêmes cas. En « Matériel », par exemple, il produisait surtout des écrans noirs et des imprimantes, ces dernières mal classées. Pour l'éviter, le serveur tire au sort un sous-thème dans la catégorie demandée et l'impose dans la consigne, en demandant que le champ `theme` le reprenne.
+- Les sous-thèmes sont dans [`donnees/sous-themes.json`](donnees/sous-themes.json) : au moins 8 par catégorie (souris, batterie de portable, station d'accueil… pour « Matériel »), et rien sur l'impression hors de « Impression ».
+- Le fichier est contrôlé au démarrage. Le serveur refuse de démarrer si une catégorie de `js/config.js` y manque, si une catégorie inconnue y figure, ou s'il y a moins de 8 sous-thèmes, un texte vide ou un doublon.
+- Le serveur évite les sous-thèmes qui correspondent à un thème déjà vu (`themes_deja_vus`) tant qu'il en reste d'autres. Quand tous ont été vus, il repart de la liste complète.
+- Les thèmes reçus sont des textes libres : la comparaison porte sur les mots significatifs, sans accents ni pluriel. Il y a correspondance quand ceux de l'un sont tous contenus dans l'autre : « Batterie » correspond à « batterie de portable », mais « Écran noir » ne correspond pas à « écran externe ».
+
 **Profil de l'utilisateur.** Le serveur tire aussi au sort, dans [`donnees/profils.json`](donnees/profils.json) :
 
 - le genre, puis le nom : « M. » / « Mme » et un nom de famille dans 90 % des cas (constante `PROBABILITE_CIVILITE`, comme 27 tickets sur 30 de `js/tickets.js`), sinon un prénom seul ;
@@ -293,6 +301,10 @@ Les tickets qui ne respectent pas les règles du générateur ne servent pas d'e
 **Ordre des réponses.** Le schéma impose au modèle l'ordre fausse, fausse (la grossière en second, si elle est demandée), en partie vraie, bonne. Il écrit ainsi la bonne réponse en dernier, en connaissant déjà la longueur des trois autres. Le ticket renvoyé est remis dans l'ordre habituel de `js/tickets.js` (bonne réponse en premier), et le site mélange l'ordre à l'affichage. Les exemples de la consigne sont présentés dans le même ordre que le schéma.
 
 **Longueur de la demande.** Elle est demandée au modèle en phrases (« 2 phrases courtes au plus »), parce qu'il compte mal les caractères. Le contrôle côté serveur reste en caractères (rejet au-delà de 250).
+
+**Ce que l'utilisateur a déjà fait.** Si la demande dit que l'utilisateur a déjà essayé quelque chose (redémarrer, vérifier le câble…), les réponses notées 2 et 1 ne doivent pas le lui proposer à nouveau. La bonne réponse doit en tenir compte explicitement, par exemple « Vous avez déjà redémarré : … ». La règle est dans le prompt et rappelée dans chaque consigne. Elle n'est pas contrôlée automatiquement : c'est un point de relecture.
+
+**Urgence.** Le prompt et la consigne rappellent la grille : « Haute » seulement si l'utilisateur est bloqué ; s'il est gêné ou peut contourner le problème, « Moyenne ». Le ton pressé de l'utilisateur ne change pas l'urgence.
 
 **Règles métier.** Le prompt contient une liste de fautes interdites dans les réponses notées 2 et 1, et la consigne la rappelle à chaque génération :
 - demander, dicter ou transmettre un mot de passe ;
@@ -411,6 +423,13 @@ Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture de
 
 Pour les métriques, `test_metriques.py` simule Ollama et vérifie trois cas : métriques présentes, métriques absentes (`null` sans erreur), et cumul sur une génération réussie à la deuxième tentative.
 
+`test_sous_themes.py` vérifie :
+- le fichier de données : 9 catégories, au moins 8 sous-thèmes chacune, aucun sous-thème d'impression hors de « Impression » ;
+- le refus de démarrer sur un fichier invalide ;
+- la comparaison avec les thèmes déjà vus, et le tirage qui les évite ;
+- la consigne, qui contient le sous-thème et les deux rappels ;
+- la route, qui impose le seul sous-thème pas encore vu.
+
 `test_navigateur.py` teste le site apprenant dans un vrai navigateur, avec Playwright et l'Edge ou le Chrome déjà installé (aucun téléchargement de navigateur) :
 - avec une série fixe (ancien format ou mode explicite), la session utilise les tickets dans l'ordre jusqu'au rapport ;
 - avec un tirage dans une sélection de 12 tickets, chacune des 3 sessions reçoit 5 tickets distincts de la sélection, et les tirages diffèrent ;
@@ -438,6 +457,7 @@ serveur/
   metriques.py                 Métriques d'une génération (cumul des tentatives, fiche du modèle, CPU/GPU)
   donnees/profils.json         Listes tirées au sort : prénoms, noms, services, tons, aisances
   donnees/alertes.json         Mots sensibles qui déclenchent une alerte de relecture
+  donnees/sous-themes.json     Sous-thèmes par catégorie (un est imposé à chaque génération)
   donnees/serie-active.json    Série active (créée à la publication, ignorée par Git)
   formateur/                   Page formateur (HTML, JS, CSS) : servie par le serveur local uniquement
   prompts/generateur_ticket.md Prompt système du générateur

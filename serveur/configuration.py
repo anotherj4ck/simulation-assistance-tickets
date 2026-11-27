@@ -43,6 +43,8 @@ OLLAMA_NUM_CTX_MINIMUM = 6144  # environ 4 000 tokens utilisés : en dessous, Ol
 
 PROFILS_JSON = Path(__file__).resolve().parent / "donnees" / "profils.json"
 ALERTES_JSON = Path(__file__).resolve().parent / "donnees" / "alertes.json"
+SOUS_THEMES_JSON = Path(__file__).resolve().parent / "donnees" / "sous-themes.json"
+MIN_SOUS_THEMES = 8  # par catégorie
 
 
 class ErreurConfiguration(Exception):
@@ -240,3 +242,43 @@ def lire_tickets_par_session(chemin: Path = CONFIG_JS) -> int:
             f"{chemin} : ticketsParSession doit être un nombre entier positif (trouvé : « {brut} »)."
         )
     return int(brut)
+
+
+# --- Sous-thèmes par catégorie : serveur/donnees/sous-themes.json ---------------
+
+
+def lire_sous_themes(categories: tuple[str, ...], chemin: Path = SOUS_THEMES_JSON) -> dict[str, tuple[str, ...]]:
+    """Sous-thèmes de chaque catégorie. Les clés doivent être exactement les
+    catégories de js/config.js, chacune avec au moins MIN_SOUS_THEMES sous-thèmes
+    non vides et tous différents ; sinon ErreurConfiguration (pas de démarrage)."""
+    try:
+        donnees = json.loads(chemin.read_text(encoding="utf-8"))
+    except OSError as erreur:
+        raise ErreurConfiguration(f"impossible de lire {chemin} ({erreur.strerror or erreur}).") from None
+    except (UnicodeDecodeError, json.JSONDecodeError) as erreur:
+        raise ErreurConfiguration(f"{chemin} n'est pas un JSON valide en UTF-8 ({erreur}).") from None
+    if not isinstance(donnees, dict):
+        raise ErreurConfiguration(f"{chemin} doit contenir un objet JSON {{ ... }}.")
+
+    cles = {cle for cle in donnees if not cle.startswith("_")}
+    manquantes = [c for c in categories if c not in cles]
+    inconnues = sorted(cles - set(categories))
+    if manquantes:
+        raise ErreurConfiguration(f"{chemin} : catégorie(s) sans sous-thèmes : {', '.join(manquantes)}.")
+    if inconnues:
+        raise ErreurConfiguration(f"{chemin} : catégorie(s) absente(s) de js/config.js : {', '.join(inconnues)}.")
+
+    resultat: dict[str, tuple[str, ...]] = {}
+    for categorie in categories:
+        liste = donnees[categorie]
+        if not isinstance(liste, list) or not all(isinstance(s, str) and s.strip() for s in liste):
+            raise ErreurConfiguration(f"{chemin} : « {categorie} » doit être une liste de textes non vides.")
+        sous_themes = tuple(s.strip() for s in liste)
+        if len(sous_themes) < MIN_SOUS_THEMES:
+            raise ErreurConfiguration(
+                f"{chemin} : « {categorie} » a {len(sous_themes)} sous-thèmes, il en faut au moins {MIN_SOUS_THEMES}."
+            )
+        if len({s.casefold() for s in sous_themes}) != len(sous_themes):
+            raise ErreurConfiguration(f"{chemin} : « {categorie} » contient des sous-thèmes en double.")
+        resultat[categorie] = sous_themes
+    return resultat
