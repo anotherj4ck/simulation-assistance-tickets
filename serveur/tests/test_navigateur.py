@@ -426,3 +426,86 @@ def test_export_annule(page, serveur_local):
     page.click("#btn-exporter")
     page.wait_for_timeout(500)
     assert telechargements == []
+
+
+# --- Métriques de génération dans la page formateur ----------------------------------
+
+METRIQUES = {
+    "modele": {"nom": "qwen3:8b", "taille": "8.2B", "quantification": "Q4_K_M", "famille": "qwen3"},
+    "repartition": {"part_gpu": 0.84, "part_cpu": 0.16, "taille_octets": 6_600_000_000, "vram_octets": 5_544_000_000},
+    "duree_serveur_s": 12.34,
+    "ollama": {"total_duration": 12_100_000_000, "load_duration": 2_060_000_000, "prompt_eval_count": 7400,
+               "eval_count": 441, "eval_duration": 10_970_000_000},
+    "tokens_par_seconde": 40.2,
+    "tentatives": 2,
+}
+METRIQUES_ABSENTES = {
+    "modele": {"nom": "qwen3:8b", "taille": None, "quantification": None, "famille": None},
+    "repartition": None,
+    "duree_serveur_s": 0.94,
+    "ollama": dict.fromkeys(["total_duration", "load_duration", "prompt_eval_count", "eval_count", "eval_duration"]),
+    "tokens_par_seconde": None,
+    "tentatives": 1,
+}
+
+
+def generer_simule(page, metriques):
+    """Clique sur « Générer » ; la réponse du serveur est simulée (pas d'appel à Ollama)."""
+    reponse = {"ticket": TICKETS[0], "alertes": [], "tentatives": 2, "modele": "qwen3:8b",
+               "consigne": {"categorie": "Réseau", "source": "Direct", "difficulte": "pas trop difficile",
+                            "avec_grossiere": True, "profil": {"ton": "calme et poli", "aisance": "à l'aise"},
+                            "exemples": ["t13-vpn"]}}
+    if metriques is not None:
+        reponse["metriques"] = metriques
+    page.route("**/api/generer-ticket", lambda route: route.fulfill(
+        status=200, content_type="application/json", body=json.dumps(reponse)))
+    page.click("#btn-generer")
+    sync_api.expect(page.locator("#zone-ticket")).to_be_visible()
+    return page.locator("#e-infos").inner_text()
+
+
+def test_metriques_affichees_en_francais_et_jamais_exportees(page, serveur_local):
+    ouvrir_formateur(page, serveur_local)
+    infos = generer_simule(page, METRIQUES)
+    assert "Tentatives : 2" in infos
+    assert "Modèle : qwen3:8b (8,2B · Q4_K_M)" in infos
+    assert "Mémoire : 16 % CPU / 84 % GPU" in infos
+    assert "Durée : 12,3 s (dont chargement 2,1 s)" in infos
+    assert "Génération : 441 tokens générés · 40,2 tokens/s" in infos
+
+    page.click("#btn-valider")
+    sync_api.expect(page.locator("#nb-valides")).to_have_text("1")
+    with page.expect_download() as telechargement:
+        page.click("#btn-exporter")
+    texte = open(telechargement.value.path(), encoding="utf-8").read()
+    stocke = page.evaluate("localStorage.getItem('formateur.ticketsValides')")
+    for contenu in (texte, stocke):
+        for cle in ("metriques", "duree_serveur_s", "eval_count", "part_gpu", "tokens_par_seconde", "Q4_K_M"):
+            assert cle not in contenu
+    exporte = json.loads(texte)
+    assert set(exporte[0]) <= {"id", "theme", "nom", "service", "source", "objet", "canal",
+                               "demande", "reponses", "pointCle", "attendu"}
+    assert exporte[0]["id"] == TICKETS[0]["id"]
+
+
+def test_metriques_absentes_n_affichent_rien_de_faux(page, serveur_local):
+    ouvrir_formateur(page, serveur_local)
+    infos = generer_simule(page, METRIQUES_ABSENTES)
+    assert "Modèle : qwen3:8b · Durée : 0,9 s" in infos
+    assert "Mémoire" not in infos and "Génération" not in infos and "chargement" not in infos
+    for mot in ("null", "NaN", "undefined"):
+        assert mot not in infos
+    assert page.erreurs == []
+
+
+def test_reponse_sans_metriques(page, serveur_local):
+    ouvrir_formateur(page, serveur_local)
+    infos = generer_simule(page, None)  # serveur plus ancien : pas de champ « metriques »
+    assert "Modèle : qwen3:8b" in infos and "Durée" not in infos
+    assert page.erreurs == []
+
+
+def test_modele_entierement_sur_le_gpu(page, serveur_local):
+    ouvrir_formateur(page, serveur_local)
+    infos = generer_simule(page, {**METRIQUES, "repartition": {**METRIQUES["repartition"], "part_gpu": 1.0, "part_cpu": 0.0}})
+    assert "Mémoire : 100 % GPU" in infos

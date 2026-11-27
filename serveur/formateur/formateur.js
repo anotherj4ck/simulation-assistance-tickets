@@ -262,7 +262,54 @@
     ajouter("Difficulté", c.difficulte);
     ajouter("Tentatives", String(reponse.tentatives || 1));
     ajouter("Exemples", (c.exemples || []).join(", "));
-    ajouter("Modèle", reponse.modele);
+    var m = reponse.metriques || {};
+    ajouter("Modèle", texteModele(m.modele) || reponse.modele);
+    ajouter("Mémoire", texteRepartition(m.repartition));
+    ajouter("Durée", texteDuree(m));
+    ajouter("Génération", texteTokens(m));
+  }
+
+  /* ---------- Métriques de génération (jamais copiées dans le ticket) ---------- */
+
+  function estNombre(v) { return typeof v === "number" && isFinite(v); }
+
+  // Format français : virgule décimale, espace pour les milliers.
+  function nombreFr(valeur, decimales) {
+    return valeur.toLocaleString("fr-FR", { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
+  }
+
+  // « qwen3:8b (8,2B · Q4_K_M) » ; le nom seul si la fiche du modèle manque.
+  function texteModele(modele) {
+    if (!modele || !modele.nom) return "";
+    var details = [modele.taille && modele.taille.replace(/(\d)\.(\d)/g, "$1,$2"), modele.quantification].filter(Boolean);
+    return modele.nom + (details.length ? " (" + details.join(" · ") + ")" : "");
+  }
+
+  // Comme la colonne PROCESSOR de « ollama ps » : « 100 % GPU » ou « 16 % CPU / 84 % GPU ».
+  function texteRepartition(repartition) {
+    if (!repartition || !estNombre(repartition.part_gpu)) return "";
+    var gpu = Math.round(repartition.part_gpu * 100);
+    if (gpu >= 100) return "100 % GPU";
+    if (gpu <= 0) return "100 % CPU";
+    return (100 - gpu) + " % CPU / " + gpu + " % GPU";
+  }
+
+  // Durée mesurée par le serveur (relances comprises), dont le chargement du modèle.
+  function texteDuree(m) {
+    var ollama = m.ollama || {};
+    var total = estNombre(m.duree_serveur_s) ? m.duree_serveur_s
+      : estNombre(ollama.total_duration) ? ollama.total_duration / 1e9 : null;
+    if (total === null) return "";
+    var texte = nombreFr(total, 1) + " s";
+    if (estNombre(ollama.load_duration)) texte += " (dont chargement " + nombreFr(ollama.load_duration / 1e9, 1) + " s)";
+    return texte;
+  }
+
+  function texteTokens(m) {
+    var produits = (m.ollama || {}).eval_count;
+    if (!estNombre(produits)) return "";
+    return nombreFr(produits, 0) + " tokens générés" +
+      (estNombre(m.tokens_par_seconde) ? " · " + nombreFr(m.tokens_par_seconde, 1) + " tokens/s" : "");
   }
 
   function afficherAlertes(alertes) {

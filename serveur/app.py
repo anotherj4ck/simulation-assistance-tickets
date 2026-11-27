@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,7 @@ from .configuration import (
     lire_tickets_par_session,
 )
 from .exemples import examiner_tickets, lire_exemples
+from . import metriques as mesures
 from . import serie as series
 from .generateur import (
     TicketRejete,
@@ -205,6 +207,51 @@ async def requete_ollama(
         raise ErreurOllama("Ollama a renvoyé une réponse illisible (JSON attendu).") from None
 
 
+# --- Métriques d'une génération (affichées par la page formateur) ------------
+
+# Fiche du modèle (/api/show), mise en cache au premier appel réussi : elle ne
+# change pas tant que le serveur tourne avec le même OLLAMA_MODEL.
+_FICHES_MODELES: dict[str, dict] = {}
+
+
+async def fiche_modele(client: httpx.AsyncClient) -> dict | None:
+    nom = REGLAGES.ollama_modele
+    if nom not in _FICHES_MODELES:
+        try:
+            reponse = await requete_ollama(client, "POST", "/api/show", json={"model": nom}, timeout=TIMEOUT_SANTE)
+        except ErreurOllama as erreur:
+            log.warning("Fiche du modèle indisponible (/api/show) : %s", erreur.message)
+            return None  # pas mise en cache : nouvel essai à la prochaine génération
+        _FICHES_MODELES[nom] = mesures.extraire_fiche(reponse)
+    return _FICHES_MODELES[nom]
+
+
+async def repartition_memoire(client: httpx.AsyncClient) -> dict | None:
+    try:
+        reponse = await requete_ollama(client, "GET", "/api/ps", timeout=TIMEOUT_SANTE)
+    except ErreurOllama as erreur:
+        log.warning("Répartition CPU/GPU indisponible (/api/ps) : %s", erreur.message)
+        return None
+    return mesures.repartition(reponse, REGLAGES.ollama_modele)
+
+
+async def metriques_generation(
+    client: httpx.AsyncClient, cumul: mesures.CumulOllama, duree_s: float, tentatives: int
+) -> dict:
+    """Métriques de la génération réussie. Ne lève jamais : au pire, des null."""
+    try:
+        fiche = await fiche_modele(client)
+    except Exception:  # noqa: BLE001 - une métrique ne doit pas faire échouer la génération
+        log.exception("Fiche du modèle : erreur inattendue")
+        fiche = None
+    try:
+        memoire = await repartition_memoire(client)
+    except Exception:  # noqa: BLE001
+        log.exception("Répartition CPU/GPU : erreur inattendue")
+        memoire = None
+    return mesures.assembler(REGLAGES.ollama_modele, fiche, cumul, duree_s, memoire, tentatives)
+
+
 def modele_installe(modele: str, noms: set[str]) -> bool:
     """« ministral-3:8b » doit figurer tel quel ; « llama3 » équivaut à « llama3:latest »."""
     return modele in noms or (":" not in modele and f"{modele}:latest" in noms)
@@ -259,6 +306,8 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
     consigne = tirer_consigne(demande.categorie, demande.difficulte, demande.source, PROFILS, EXEMPLES)
     schema = schema_ticket(CATEGORIES, consigne)
     motifs: list[str] = []
+    debut = time.perf_counter()
+    cumul = mesures.CumulOllama()  # métriques d'Ollama, additionnées sur les tentatives
 
     for tentative in range(1, NB_RELANCES + 2):
         corps = {
@@ -273,6 +322,7 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             "options": {"num_ctx": REGLAGES.ollama_num_ctx},
         }
         reponse = await requete_ollama(request.app.state.ollama, "POST", "/api/chat", json=corps)
+        cumul.ajouter(reponse)
         contenu = (reponse.get("message") or {}).get("content")
         if not isinstance(contenu, str):
             raise ErreurOllama("Ollama a renvoyé une réponse sans message.")
@@ -290,8 +340,11 @@ async def generer_ticket(demande: DemandeTicket, request: Request) -> dict:
             log.warning("Ticket rejeté (tentative %d) : %s", tentative, rejet)
             continue
 
+        duree = time.perf_counter() - debut  # génération seule, relances comprises
         return {
             "ticket": ticket,
+            # À part du ticket : le format des tickets reste celui de js/tickets.js.
+            "metriques": await metriques_generation(request.app.state.ollama, cumul, duree, tentative),
             # Non bloquant : passages à relire en priorité par le formateur.
             "alertes": alertes_de_relecture(ticket, MOTS_ALERTES),
             "tentatives": tentative,

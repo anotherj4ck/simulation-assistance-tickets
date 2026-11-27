@@ -58,6 +58,14 @@ Une fois le serveur lancé, ouvrez <http://127.0.0.1:8000/formateur.html>. Cette
 - **En-tête** : au chargement, la page interroge `/api/sante` et affiche le modèle utilisé (pastille verte). Si Ollama ou le modèle ne répond pas, un bandeau rouge explique quoi faire, avec un bouton « Revérifier ».
 - **Génération** : choisissez la catégorie (liste de `js/config.js`), la difficulté et, si vous le souhaitez, la source (sinon elle est tirée au hasard), puis cliquez sur « Générer ». Un indicateur tourne pendant l'attente (comptez 20 à 60 s) et affiche le temps écoulé.
 - **Alertes** : les passages sensibles des réponses notées ✓ ou ~ apparaissent dans un bandeau orange au-dessus du ticket (voir « Alertes de relecture » plus bas).
+- **Informations sur la génération** : une ligne sous le titre du ticket rappelle :
+  - le profil imposé, la difficulté, le nombre de tentatives et les exemples utilisés ;
+  - le modèle avec sa taille et sa quantification, par exemple « qwen3:8b (8,2B · Q4_K_M) » ;
+  - la répartition en mémoire, par exemple « 100 % GPU » ou « 16 % CPU / 84 % GPU » ;
+  - la durée totale, chargement du modèle compris, par exemple « 12,3 s (dont chargement 2,1 s) » ;
+  - les tokens générés et la vitesse, par exemple « 441 tokens générés · 40,2 tokens/s ».
+
+  Une information indisponible est simplement omise. Ces mesures ne sont jamais enregistrées dans le ticket, la liste ou l'export.
 - **Relecture** : tous les textes sont modifiables (thème, nom, service, objet ou canal, demande, réponses, point clé). On peut aussi changer :
   - la note de chaque réponse : ✓ bonne, ~ en partie vraie, ✗ fausse, ✗✗ grossière ;
   - les valeurs attendues : cocher plusieurs valeurs les rend toutes acceptées.
@@ -171,6 +179,15 @@ Réponse :
 {
   "ticket": { "id": "ia-…", "theme": "…", "nom": "…", "source": "…", "reponses": [ … ], "attendu": { … } },
   "alertes": [ "réponse en partie vraie (note 1) : contient « mot de passe », à relire : « … »" ],
+  "metriques": {
+    "modele": { "nom": "qwen3:8b", "taille": "8.2B", "quantification": "Q4_K_M", "famille": "qwen3" },
+    "repartition": { "part_gpu": 1.0, "part_cpu": 0.0, "taille_octets": 6194766806, "vram_octets": 6194766806 },
+    "duree_serveur_s": 17.443,
+    "ollama": { "total_duration": 17438907600, "load_duration": 4565918800, "prompt_eval_count": 3720,
+                "eval_count": 450, "eval_duration": 11011224000 },
+    "tokens_par_seconde": 40.9,
+    "tentatives": 1
+  },
   "tentatives": 1,
   "modele": "ministral-3:8b",
   "consigne": {
@@ -180,6 +197,15 @@ Réponse :
   }
 }
 ```
+
+`metriques` décrit la génération ; il est séparé du ticket et n'y est jamais copié, ni dans l'export.
+- `modele` : la fiche du modèle, lue avec `/api/show` d'Ollama et gardée en mémoire après le premier appel réussi.
+- `repartition` : la part du modèle en mémoire vidéo, `size_vram / size` lu avec `/api/ps` juste après la génération. C'est le calcul de la colonne `PROCESSOR` de `ollama ps`.
+- `duree_serveur_s` : la durée mesurée par le serveur, relances comprises.
+- `ollama` : les métriques renvoyées par `/api/chat` (durées en nanosecondes, compteurs en tokens), additionnées sur toutes les tentatives. Un total vaut `null` si une tentative ne l'a pas fourni, plutôt que de donner une somme partielle.
+- `tokens_par_seconde` : `eval_count` divisé par `eval_duration`.
+
+Toute information indisponible vaut `null` : Ollama trop ancien, `/api/show` ou `/api/ps` en erreur, modèle déjà déchargé. Une métrique ne fait jamais échouer une génération.
 
 `ticket` est au format de `js/tickets.js` : une valeur seule dans `attendu` devient une chaîne, plusieurs valeurs restent un tableau ; `objet` n'apparaît que pour un courriel, `canal` que pour la source « Autre » ; `grossiere: true` n'apparaît que sur la réponse concernée. L'identifiant commence par `ia-` pour ne jamais entrer en conflit avec `t01` à `t30`.
 
@@ -381,7 +407,9 @@ python -m pip install -r serveur\requirements-dev.txt
 python -m pytest serveur\tests
 ```
 
-Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis, l'API des séries et la validation des fichiers importés.
+Les tests n'appellent pas Ollama. Ils vérifient la configuration, la lecture des tickets, le générateur (schéma, format, alertes), les fichiers servis, l'API des séries, la validation des fichiers importés et les métriques.
+
+Pour les métriques, `test_metriques.py` simule Ollama et vérifie trois cas : métriques présentes, métriques absentes (`null` sans erreur), et cumul sur une génération réussie à la deuxième tentative.
 
 `test_navigateur.py` teste le site apprenant dans un vrai navigateur, avec Playwright et l'Edge ou le Chrome déjà installé (aucun téléchargement de navigateur) :
 - avec une série fixe (ancien format ou mode explicite), la session utilise les tickets dans l'ordre jusqu'au rapport ;
@@ -407,6 +435,7 @@ serveur/
   generateur.py                Consigne (tirages au sort), schéma JSON, validation, contrôles, format final
   exemples.py                  Lecture et validation strictes des tickets, choix et mise en forme des exemples
   serie.py                     Série publiée pour les apprenants : validation, écriture atomique, lecture, retrait
+  metriques.py                 Métriques d'une génération (cumul des tentatives, fiche du modèle, CPU/GPU)
   donnees/profils.json         Listes tirées au sort : prénoms, noms, services, tons, aisances
   donnees/alertes.json         Mots sensibles qui déclenchent une alerte de relecture
   donnees/serie-active.json    Série active (créée à la publication, ignorée par Git)
